@@ -132,7 +132,7 @@ export default function App() {
   };
 
   const updatePerson = (id: string, field: keyof Person, value: any) => {
-    setPersons(persons.map(p => p.id === id ? { ...p, [field]: value } : p));
+    setPersons(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
   const addExpense = (personId: string) => {
@@ -160,7 +160,7 @@ export default function App() {
   };
 
   const updateExpense = (personId: string, expenseId: string, field: keyof ExpenseItem, value: any) => {
-    setPersons(persons.map(p => {
+    setPersons(prev => prev.map(p => {
       if (p.id === personId) {
         return {
           ...p,
@@ -169,6 +169,18 @@ export default function App() {
       }
       return p;
     }));
+  };
+
+  const selectStaffForPerson = (personId: string, staff: { name: string, nip: string }) => {
+    setPersons(prev => prev.map(p => p.id === personId ? { ...p, name: staff.name, nip: staff.nip } : p));
+    setSearchTerm(staff.name);
+    setActivePersonIdForSearch(null);
+  };
+
+  const selectStaffForBendahara = (staff: { name: string, nip: string }) => {
+    setHeader(prev => ({ ...prev, bendaharaName: staff.name, bendaharaNip: staff.nip }));
+    setSearchTerm(staff.name);
+    setActivePersonIdForSearch(null);
   };
 
   const grandTotal = useMemo(() => {
@@ -362,17 +374,17 @@ export default function App() {
                       <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Staff</span>
                     </div>
                     <div className="max-h-60 overflow-y-auto no-scrollbar">
-                      {filteredStaff.map(staff => (
+                      {filteredStaff.map((staff, sIdx) => (
                         <button
-                          key={staff.nip}
+                          key={`${staff.nip}-${sIdx}`}
                           type="button"
                           className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                          onClick={() => {
-                            setHeader({...header, bendaharaName: staff.name, bendaharaNip: staff.nip});
-                            setActivePersonIdForSearch(null);
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectStaffForBendahara(staff);
                           }}
                         >
-                          <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors">{staff.name}</div>
+                          <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
                           <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
                         </button>
                       ))}
@@ -442,18 +454,17 @@ export default function App() {
                             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian</span>
                           </div>
                           <div className="max-h-60 overflow-y-auto no-scrollbar">
-                            {filteredStaff.map(staff => (
+                            {filteredStaff.map((staff, sIdx) => (
                               <button
-                                key={staff.nip}
+                                key={`${staff.nip}-${sIdx}`}
                                 type="button"
                                 className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                                onClick={() => {
-                                  updatePerson(p.id, 'name', staff.name);
-                                  updatePerson(p.id, 'nip', staff.nip);
-                                  setActivePersonIdForSearch(null);
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  selectStaffForPerson(p.id, staff);
                                 }}
                               >
-                                <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors">{staff.name}</div>
+                                <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
                                 <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
                               </button>
                             ))}
