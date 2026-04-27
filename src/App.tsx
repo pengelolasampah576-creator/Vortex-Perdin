@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -14,7 +14,9 @@ import {
   FileText,
   UserPlus,
   Search,
-  Download
+  Download,
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { STAFF_DATABASE } from './constants';
@@ -81,15 +83,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  const filteredStaff = useMemo(() => {
-    if (!searchTerm) return [];
-    return STAFF_DATABASE.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 8);
-  }, [searchTerm]);
+  const STORAGE_KEY = 'vortex_perdin_v1';
 
-  const [header, setHeader] = useState<DocHeader>({
+  const defaultHeader: DocHeader = {
     st: 'B-302/INSP/800.1.2/X/2025',
     stDate: '14 Oktober 2025',
     tujuan: 'Mengikuti Kegiatan Diklat FGD Probity Audit di Grand QIN Hotel Banjarbaru',
@@ -99,9 +97,9 @@ export default function App() {
     bendaharaNip: '19801130 200701 2 006',
     place: 'Tanjung',
     printDate: '20 Oktober 2025'
-  });
+  };
 
-  const [persons, setPersons] = useState<Person[]>([
+  const defaultPersons: Person[] = [
     {
       id: '1',
       name: 'Wahyu Gunawan, S.Pd.',
@@ -114,7 +112,50 @@ export default function App() {
         { id: '4', description: 'Biaya Transportasi', quantity: 1, unit: 'Layanan', rate: 180000 },
       ]
     }
-  ]);
+  ];
+
+  const [header, setHeader] = useState<DocHeader>(defaultHeader);
+  const [persons, setPersons] = useState<Person[]>(defaultPersons);
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        const { header: savedHeader, persons: savedPersons } = JSON.parse(savedData);
+        if (savedHeader) setHeader(savedHeader);
+        if (savedPersons) setPersons(savedPersons);
+      } catch (e) {
+        console.error('Failed to load saved data', e);
+      }
+    }
+  }, []);
+
+  const handleManualSave = () => {
+    setSaveStatus('saving');
+    const dataToSave = { header, persons };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    
+    setTimeout(() => {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 600);
+  };
+
+  const handleReset = () => {
+    if (confirm('Apakah Anda yakin ingin menghapus semua data dan kembali ke format awal?')) {
+      setHeader(defaultHeader);
+      setPersons(defaultPersons);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
+  const filteredStaff = useMemo(() => {
+    if (!searchTerm) return [];
+    return STAFF_DATABASE.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ).slice(0, 8);
+  }, [searchTerm]);
 
   const addPerson = () => {
     const newPerson: Person = {
@@ -538,6 +579,34 @@ export default function App() {
         </div>
 
         <div className="pt-6 border-t border-white/10 mt-auto space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={handleReset}
+              className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold py-3 rounded-2xl transition-all border border-white/10 uppercase text-[10px] tracking-widest"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+            <button 
+              onClick={handleManualSave}
+              disabled={saveStatus !== 'idle'}
+              className={`flex items-center justify-center gap-2 font-bold py-3 rounded-2xl transition-all border uppercase text-[10px] tracking-widest ${
+                saveStatus === 'saved' 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
+                  : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              {saveStatus === 'saving' ? (
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : saveStatus === 'saved' ? (
+                <CheckCircle2 size={12} />
+              ) : (
+                <Save size={12} />
+              )}
+              {saveStatus === 'saved' ? 'Tersimpan' : 'Simpan'}
+            </button>
+          </div>
+          
           <button 
             onClick={handleExportExcel}
             className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-2xl transition-all border border-white/10 uppercase text-xs tracking-widest"
