@@ -247,11 +247,12 @@ export default function App() {
       ['ST', ':', `${header.st} Tanggal ${header.stDate}`],
       ['TUJUAN', ':', `${header.tujuan} pada Tanggal ${header.tujuanStartDate} s.d ${header.tujuanEndDate}`],
       [''],
-      ['NO', 'NAMA / NIP', 'RINCIAN BIAYA', 'QTY', 'UNIT', '', 'HARGA SATUAN', '', 'JUMLAH', 'KET'],
+      ['NO', 'NAMA / NIP', 'RINCIAN BIAYA', 'QTY', 'UNIT', '', 'HARGA SATUAN', '', 'JUMLAH', 'TOTAL'],
     ];
 
     persons.forEach((person, index) => {
       // Name and NIP row
+      const pTotal = person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0);
       data.push([
         index + 1,
         person.name,
@@ -262,7 +263,7 @@ export default function App() {
         person.expenses[0]?.rate || 0,
         '=',
         (person.expenses[0]?.quantity || 0) * (person.expenses[0]?.rate || 0),
-        person.ket
+        pTotal
       ]);
 
       if (person.nip) {
@@ -285,10 +286,6 @@ export default function App() {
         ]);
       });
 
-      // Total for person
-      const pTotal = person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0);
-      data.push(['', 'TOTAL', '', '', '', '', '', '', pTotal, '']);
-      data.push(['', 'TERBILANG', `# ${terbilang(pTotal)} Rupiah #`]);
       data.push(['']);
     });
 
@@ -360,7 +357,7 @@ export default function App() {
                     type="text" 
                     value={header.stDate}
                     onChange={(e) => setHeader({...header, stDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10" 
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
                 </div>
                 <div className="group">
@@ -369,7 +366,7 @@ export default function App() {
                     type="text" 
                     value={header.place}
                     onChange={(e) => setHeader({...header, place: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10" 
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
                 </div>
               </div>
@@ -379,6 +376,37 @@ export default function App() {
                   value={header.tujuan}
                   onChange={(e) => setHeader({...header, tujuan: e.target.value})}
                   className="w-full text-sm bg-white/5 border-white/10 rounded-xl h-24 text-white group-hover:bg-white/10 p-2"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Mulai Kegiatan</label>
+                  <input 
+                    type="text" 
+                    value={header.tujuanStartDate}
+                    onChange={(e) => setHeader({...header, tujuanStartDate: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
+                  />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Selesai Kegiatan</label>
+                  <input 
+                    type="text" 
+                    value={header.tujuanEndDate}
+                    onChange={(e) => setHeader({...header, tujuanEndDate: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
+                  />
+                </div>
+              </div>
+
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal Cetak (Kwitansi)</label>
+                <input 
+                  type="text" 
+                  value={header.printDate}
+                  onChange={(e) => setHeader({...header, printDate: e.target.value})}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2 font-bold text-indigo-300" 
                 />
               </div>
             </div>
@@ -565,15 +593,15 @@ export default function App() {
                       ))}
                     </div>
 
-                    <input 
-                      placeholder="Keterangan (KET)" 
-                      value={p.ket}
-                      onChange={(e) => updatePerson(p.id, 'ket', e.target.value)}
-                      className="w-full text-[10px] italic bg-white/5 border-white/5 rounded-lg p-2 text-slate-300"
-                    />
+                      <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-xs font-bold text-white">
+                        <span className="uppercase text-[9px] text-slate-500 tracking-wider">Total Nominal</span>
+                        <span className="text-indigo-400 font-mono">
+                          {formatCurrency(p.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0))}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </section>
         </div>
@@ -655,17 +683,17 @@ export default function App() {
             <div key={person.id} className="mb-6 break-inside-avoid">
               <table className="w-full border-collapse border-2 border-black text-[11px]">
                 <thead>
-                  <tr className="bg-neutral-50 uppercase font-bold text-center border-b-2 border-black">
-                    <th className="border-r-2 border-black w-8 py-1">No</th>
-                    <th className="border-r-2 border-black w-48">Nama/NIP</th>
-                    <th className="border-r-2 border-black">Jumlah Yang Diterima</th>
-                    <th className="border-r-2 border-black w-20">Ket</th>
-                    <th className="w-28 py-1">Tanda Terima Uang</th>
+                  <tr className="bg-neutral-100 uppercase font-bold text-center border-b-2 border-black transition-colors">
+                    <th className="border-r-2 border-black w-8 py-2 text-[10px]">No</th>
+                    <th className="border-r-2 border-black w-48 py-2 text-[10px] font-black">Nama / NIP</th>
+                    <th className="border-r-2 border-black py-2 text-[10px]">Rincian Komponen Biaya Perjalanan Dinas</th>
+                    <th className="border-r-2 border-black w-24 py-2 text-[10px]">Jumlah (Rp)</th>
+                    <th className="w-28 py-2 text-[10px]">Tanda Terima</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="border-r-2 border-black text-center align-top py-2">{index + 1}</td>
+                  <tr className="bg-white">
+                    <td className="border-r-2 border-black text-center align-top py-2 font-bold">{index + 1}</td>
                     <td className="border-r-2 border-black align-top p-2 leading-tight">
                       <div className="font-bold underline mb-1 uppercase text-xs">{person.name}</div>
                       <div className="uppercase">NIP. {person.nip}</div>
@@ -674,12 +702,12 @@ export default function App() {
                       <table className="w-full">
                         <tbody>
                           {person.expenses.map((exp, idx) => (
-                            <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-300" : ""}>
+                            <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-200" : ""}>
                               <td className="p-1 w-28">{exp.description}</td>
-                              <td className="p-1 w-20 text-center">{exp.quantity} {exp.unit}</td>
-                              <td className="p-1 w-4 text-center">x</td>
-                              <td className="p-1 text-right w-24">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
-                              <td className="p-1 w-4 text-center">=</td>
+                              <td className="p-1 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
+                              <td className="p-1 w-4 text-center text-neutral-300">x</td>
+                              <td className="p-1 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
+                              <td className="p-1 w-4 text-center text-neutral-300">=</td>
                               <td className="p-1 text-right font-medium">
                                 {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
                               </td>
@@ -688,27 +716,11 @@ export default function App() {
                         </tbody>
                       </table>
                     </td>
-                    <td className="border-r-2 border-black text-center align-top py-2 px-1 text-[10px] italic underline">
-                      {person.ket}
+                    <td className="border-r-2 border-black text-right align-top py-2 px-2 text-[11px] font-black">
+                      {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
                     </td>
                     <td className="align-middle text-center p-2 text-neutral-300 relative">
                      <span className="block border-b border-dotted border-neutral-400 w-full mt-4"></span>
-                    </td>
-                  </tr>
-                  {/* Footer Row for Person */}
-                  <tr className="border-t-2 border-black">
-                    <td colSpan={2} className="border-r-2 border-black text-center font-bold px-2 py-1 uppercase italic bg-neutral-200">
-                      Total
-                    </td>
-                    <td className="border-r-2 border-black text-right font-black px-2 py-1 text-sm bg-neutral-100">
-                      {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
-                    </td>
-                    <td colSpan={2} className="bg-neutral-200"></td>
-                  </tr>
-                  <tr className="border-t-2 border-black">
-                    <td className="border-r-2 border-black italic font-bold p-1 italic text-center">TERBILANG</td>
-                    <td colSpan={4} className="p-1 italic font-bold uppercase tracking-tight">
-                      # {terbilang(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0))} Rupiah #
                     </td>
                   </tr>
                 </tbody>
@@ -717,15 +729,22 @@ export default function App() {
           ))}
 
           {/* Grand Total Bar */}
-          <div className="bg-neutral-100 border-2 border-black p-3 mb-10 flex justify-between items-center break-inside-avoid">
-            <span className="italic font-bold text-base">Telah Dibayar Sejumlah Rp</span>
-            <span className="font-black text-xl italic">{formatCurrency(grandTotal).replace('Rp ', '')}</span>
+          <div className="bg-neutral-100 border-2 border-black mb-10 break-inside-avoid shadow-sm">
+            <div className="p-4 flex justify-between items-center border-b border-black">
+              <span className="italic font-black text-lg tracking-wider uppercase">Total Dibayarkan Sejumlah Rp</span>
+              <span className="font-black text-3xl italic">{formatCurrency(grandTotal).replace('Rp ', '')}</span>
+            </div>
+            <div className="p-2 px-4 bg-white italic font-bold text-[11px] uppercase tracking-tight">
+              # {terbilang(grandTotal)} Rupiah #
+            </div>
           </div>
 
           {/* Signatures */}
           <div className="grid grid-cols-2 gap-10 mt-10 text-sm break-inside-avoid px-8">
             <div className="text-center space-y-16">
-              <div className="font-medium">Bendahara</div>
+              <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+                <span>Bendahara,</span>
+              </div>
               <div className="flex flex-col items-center">
                 <span className="font-bold underline uppercase text-[15px]">{header.bendaharaName}</span>
                 <span className="uppercase text-xs">NIP. {header.bendaharaNip}</span>
@@ -733,7 +752,10 @@ export default function App() {
             </div>
 
             <div className="text-center space-y-16">
-              <div className="font-medium">{header.place}, {header.printDate} <br/> Pembuat Daftar,</div>
+              <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+                <span className="text-[11px] mb-1">{header.place}, {header.printDate}</span>
+                <span>Pembuat Daftar,</span>
+              </div>
               <div className="flex flex-col items-center">
                 <span className="font-bold underline uppercase text-[15px]">{persons[0]?.name || '......................................'}</span>
                 <span className="uppercase text-xs">NIP. {persons[0]?.nip || '......................................'}</span>
