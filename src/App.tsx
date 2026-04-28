@@ -16,7 +16,8 @@ import {
   Search,
   Download,
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { STAFF_DATABASE } from './constants';
@@ -57,19 +58,25 @@ interface ExpenseItem {
   quantity: number;
   unit: string;
   rate: number;
+  isRiil?: boolean;
 }
 
 interface Person {
   id: string;
   name: string;
   nip: string;
+  jabatan: string;
+  unitKerja: string;
   expenses: ExpenseItem[];
   ket: string;
+  riilDescription: string;
 }
 
 interface DocHeader {
   st: string;
   stDate: string;
+  spdNumber: string;
+  spdDate: string;
   tujuan: string;
   tujuanStartDate: string;
   tujuanEndDate: string;
@@ -77,10 +84,32 @@ interface DocHeader {
   bendaharaNip: string;
   place: string;
   printDate: string;
+  listMakerName: string;
+  listMakerNip: string;
+  dasarPoints?: string[];
+  hasilDescriptive?: string;
+  hasilPoints?: string[];
+  inspectorName?: string;
+  inspectorNip?: string;
+  inspectorJabatan?: string;
+  inspectorUnit?: string;
+  photos?: string[];
+  tahunAnggaran: string;
+  kegiatan: string;
+  subKegiatan: string;
+  kodeRekening: string;
+  bkUmum: string;
+  bkTanggal: string;
+  penerimaDuit: string;
+  pptkName: string;
+  pptkNip: string;
+  paName: string;
+  paNip: string;
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+  const [viewMode, setViewMode] = useState<'kwitansi' | 'riil' | 'pernyataan' | 'laporan' | 'foto' | 'kwitansi_asli'>('kwitansi');
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -90,13 +119,46 @@ export default function App() {
   const defaultHeader: DocHeader = {
     st: 'B-302/INSP/800.1.2/X/2025',
     stDate: '14 Oktober 2025',
+    spdNumber: '36/INSP/000.1.2.3/I/2025',
+    spdDate: '30 Januari 2025',
     tujuan: 'Mengikuti Kegiatan Diklat FGD Probity Audit di Grand QIN Hotel Banjarbaru',
     tujuanStartDate: '15',
     tujuanEndDate: '18 Oktober 2025',
     bendaharaName: 'Sumiati. SE',
     bendaharaNip: '19801130 200701 2 006',
     place: 'Tanjung',
-    printDate: '20 Oktober 2025'
+    printDate: '20 Oktober 2025',
+    listMakerName: 'Wahyu Gunawan, S.Pd.',
+    listMakerNip: '19890630 202521 1 045',
+    dasarPoints: [
+      'Lembar Disposisi dan Nota Dinas dari Bupati Tabalong Kabupaten Tabalong : B-46/INSP/000.1.2.3/I/2026 Tgl: 29 Januari 2026',
+      'Surat Tugas dari Bupati Kabupaten Tabalong : B-36/INSP/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
+      'Surat Tugas dari Inspektur di Inspektorat Daerah Kabupaten Tabalong : B-38/INSP/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
+      'SPD dari Insperktur Inspektorat Daerah Kabupaten Tabalong : 36/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
+      'SPD dari Insperktur Inspektorat Daerah Kabupaten Tabalong : 35/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026'
+    ],
+    hasilDescriptive: 'Telah melakukan perjalanan dinas dengan hasil sebagai berikut :',
+    hasilPoints: [
+      'Input Dokumen Perencanaan: Mengunggah dokumen Rencana Strategis (Renstra), Rencana Kerja (Renja), dan Perjanjian Kinerja (PK) tahun berjalan.',
+      'Pengunggahan Bukti Dukung (Evidence): Setiap capaian yang diinput wajib disertai dokumen pendukung (seperti laporan kegiatan, foto, atau daftar hadir) sebagai basis validasi.',
+      'Tim Reviu dari Inspektorat akan memeriksa keabsahan data dan bukti dukung yang diunggah. Dalam e-SAKIP Pro, terdapat modul khusus reviu yang memungkinkan auditor memberikan catatan atau perbaikan secara langsung di aplikasi.'
+    ],
+    inspectorName: 'DIYANTO, SE, MT, FRMP',
+    inspectorNip: '19711013 200501 1 005',
+    inspectorJabatan: 'INSPEKTUR',
+    inspectorUnit: 'Pembina Tk.I',
+    photos: [],
+    tahunAnggaran: '2026',
+    kegiatan: 'Administrasi Umum Perangkat Daerah',
+    subKegiatan: 'Penyelenggaraan Rapat Koordinasi dan Konsultasi SKPD',
+    kodeRekening: '5.1.02.04.01.0001',
+    bkUmum: '',
+    bkTanggal: '',
+    penerimaDuit: 'Bendahara Pengeluaran Inspektorat Daerah Kabupaten Tabalong',
+    pptkName: 'SYAHRIADI, S.Sos, M.Si',
+    pptkNip: '19781202 200501 1 008',
+    paName: 'DIYANTO, SE, MT, FRMP',
+    paNip: '19711013 200501 1 005',
   };
 
   const defaultPersons: Person[] = [
@@ -104,12 +166,15 @@ export default function App() {
       id: '1',
       name: 'Wahyu Gunawan, S.Pd.',
       nip: '19890630 202521 1 045',
+      jabatan: 'Auditor Ahli Pertama',
+      unitKerja: 'Inspektorat Kabupaten Tabalong',
       ket: 'H-1 & H+1 Hari H',
+      riilDescription: 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
       expenses: [
-        { id: '1', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 380000 },
-        { id: '2', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 110000 },
-        { id: '3', description: 'Biaya Penginapan', quantity: 3, unit: 'Malam', rate: 250000 },
-        { id: '4', description: 'Biaya Transportasi', quantity: 1, unit: 'Layanan', rate: 180000 },
+        { id: '1', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 380000, isRiil: false },
+        { id: '2', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 110000, isRiil: false },
+        { id: '3', description: 'Biaya Penginapan', quantity: 3, unit: 'Malam', rate: 250000, isRiil: true },
+        { id: '4', description: 'Biaya Transportasi', quantity: 1, unit: 'Layanan', rate: 180000, isRiil: false },
       ]
     }
   ];
@@ -123,8 +188,26 @@ export default function App() {
     if (savedData) {
       try {
         const { header: savedHeader, persons: savedPersons } = JSON.parse(savedData);
-        if (savedHeader) setHeader(savedHeader);
-        if (savedPersons) setPersons(savedPersons);
+        if (savedHeader) {
+          setHeader(prev => ({
+            ...prev,
+            ...savedHeader
+          }));
+        }
+        if (savedPersons) {
+          // Merge saved persons with default properties to handle schema updates
+          const migratedPersons = savedPersons.map((p: any) => ({
+            ...p,
+            jabatan: p.jabatan ?? '',
+            unitKerja: p.unitKerja ?? 'Inspektorat Daerah Kabupaten Tabalong',
+            riilDescription: p.riilDescription ?? 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+            expenses: p.expenses.map((e: any) => ({
+              ...e,
+              isRiil: e.isRiil ?? false
+            }))
+          }));
+          setPersons(migratedPersons);
+        }
       } catch (e) {
         console.error('Failed to load saved data', e);
       }
@@ -162,8 +245,11 @@ export default function App() {
       id: crypto.randomUUID(),
       name: '',
       nip: '',
+      jabatan: '',
+      unitKerja: 'Inspektorat Daerah Kabupaten Tabalong',
       ket: '',
-      expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0 }]
+      riilDescription: 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+      expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false }]
     };
     setPersons([...persons, newPerson]);
   };
@@ -181,7 +267,7 @@ export default function App() {
       if (p.id === personId) {
         return {
           ...p,
-          expenses: [...p.expenses, { id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0 }]
+          expenses: [...p.expenses, { id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false }]
         };
       }
       return p;
@@ -212,14 +298,26 @@ export default function App() {
     }));
   };
 
-  const selectStaffForPerson = (personId: string, staff: { name: string, nip: string }) => {
-    setPersons(prev => prev.map(p => p.id === personId ? { ...p, name: staff.name, nip: staff.nip } : p));
-    setSearchTerm(staff.name);
+  const selectStaffForPerson = (personId: string, staff: any) => {
+    setPersons(prev => prev.map(p => p.id === personId ? { 
+      ...p, 
+      name: staff.name, 
+      nip: staff.nip,
+      jabatan: staff.jabatan || p.jabatan,
+      unitKerja: staff.unitKerja || p.unitKerja
+    } : p));
+    setSearchTerm('');
     setActivePersonIdForSearch(null);
   };
 
   const selectStaffForBendahara = (staff: { name: string, nip: string }) => {
     setHeader(prev => ({ ...prev, bendaharaName: staff.name, bendaharaNip: staff.nip }));
+    setSearchTerm(staff.name);
+    setActivePersonIdForSearch(null);
+  };
+
+  const selectStaffForListMaker = (staff: { name: string, nip: string }) => {
+    setHeader(prev => ({ ...prev, listMakerName: staff.name, listMakerNip: staff.nip }));
     setSearchTerm(staff.name);
     setActivePersonIdForSearch(null);
   };
@@ -296,8 +394,8 @@ export default function App() {
     data.push(['']);
     data.push(['']);
     data.push(['']);
-    data.push([header.bendaharaName, '', '', '', '', '', persons[0]?.name || '']);
-    data.push([`NIP. ${header.bendaharaNip}`, '', '', '', '', '', persons[0]?.nip ? `NIP. ${persons[0].nip}` : '']);
+    data.push([header.bendaharaName, '', '', '', '', '', header.listMakerName]);
+    data.push([`NIP. ${header.bendaharaNip}`, '', '', '', '', '', header.listMakerNip ? `NIP. ${header.listMakerNip}` : '']);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, "Kwitansi Perdin");
@@ -345,7 +443,7 @@ export default function App() {
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor ST</label>
                 <input 
                   type="text" 
-                  value={header.st}
+                  value={header.st ?? ''}
                   onChange={(e) => setHeader({...header, st: e.target.value})}
                   className="w-full text-sm bg-white/5 border-white/10 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-white placeholder-slate-600 transition-all group-hover:bg-white/10" 
                 />
@@ -355,7 +453,7 @@ export default function App() {
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal ST</label>
                   <input 
                     type="text" 
-                    value={header.stDate}
+                    value={header.stDate ?? ''}
                     onChange={(e) => setHeader({...header, stDate: e.target.value})}
                     className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
@@ -364,16 +462,37 @@ export default function App() {
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kota/Tempat</label>
                   <input 
                     type="text" 
-                    value={header.place}
+                    value={header.place ?? ''}
                     onChange={(e) => setHeader({...header, place: e.target.value})}
                     className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor SPD</label>
+                  <input 
+                    type="text" 
+                    value={header.spdNumber ?? ''}
+                    onChange={(e) => setHeader({...header, spdNumber: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
+                  />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal SPD</label>
+                  <input 
+                    type="text" 
+                    value={header.spdDate ?? ''}
+                    onChange={(e) => setHeader({...header, spdDate: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
+                  />
+                </div>
+              </div>
+
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tujuan Kegiatan</label>
                 <textarea 
-                  value={header.tujuan}
+                  value={header.tujuan ?? ''}
                   onChange={(e) => setHeader({...header, tujuan: e.target.value})}
                   className="w-full text-sm bg-white/5 border-white/10 rounded-xl h-24 text-white group-hover:bg-white/10 p-2"
                 />
@@ -384,7 +503,7 @@ export default function App() {
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Mulai Kegiatan</label>
                   <input 
                     type="text" 
-                    value={header.tujuanStartDate}
+                    value={header.tujuanStartDate ?? ''}
                     onChange={(e) => setHeader({...header, tujuanStartDate: e.target.value})}
                     className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
@@ -393,7 +512,7 @@ export default function App() {
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Selesai Kegiatan</label>
                   <input 
                     type="text" 
-                    value={header.tujuanEndDate}
+                    value={header.tujuanEndDate ?? ''}
                     onChange={(e) => setHeader({...header, tujuanEndDate: e.target.value})}
                     className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
                   />
@@ -401,13 +520,125 @@ export default function App() {
               </div>
 
               <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal Cetak (Kwitansi)</label>
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal Cetak (Rincian Biaya)</label>
                 <input 
                   type="text" 
-                  value={header.printDate}
+                  value={header.printDate ?? ''}
                   onChange={(e) => setHeader({...header, printDate: e.target.value})}
                   className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2 font-bold text-indigo-300" 
                 />
+              </div>
+
+              <div className="group relative">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pembuat Daftar</label>
+                <input 
+                  type="text" 
+                  placeholder="Cari Pembuat Daftar..."
+                  value={header.listMakerName ?? ''}
+                  onChange={(e) => {
+                    setHeader({...header, listMakerName: e.target.value});
+                    setSearchTerm(e.target.value);
+                    setActivePersonIdForSearch('listMaker');
+                  }}
+                  onFocus={() => {
+                    setSearchTerm(header.listMakerName ?? '');
+                    setActivePersonIdForSearch('listMaker');
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setActivePersonIdForSearch(null), 200);
+                  }}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 pr-8 font-bold" 
+                />
+                <div className="absolute right-2 top-8 text-white/20">
+                  <Search size={14} />
+                </div>
+                {activePersonIdForSearch === 'listMaker' && filteredStaff.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl font-sans">
+                    <div className="p-2 border-b border-white/5 bg-white/5">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pembuat Daftar</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto no-scrollbar">
+                      {filteredStaff.map((staff, sIdx) => (
+                        <button
+                          key={`${staff.nip}-${sIdx}`}
+                          type="button"
+                          className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectStaffForListMaker(staff);
+                          }}
+                        >
+                          <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
+                          <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Pembuat Daftar</label>
+                <input 
+                  type="text" 
+                  value={header.listMakerNip ?? ''}
+                  onChange={(e) => setHeader({...header, listMakerNip: e.target.value})}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 font-mono" 
+                />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Data Kwitansi Formal</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tahun Anggaran</label>
+                  <input type="text" value={header.tahunAnggaran} onChange={(e) => setHeader({...header, tahunAnggaran: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kode Rekening</label>
+                  <input type="text" value={header.kodeRekening} onChange={(e) => setHeader({...header, kodeRekening: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                </div>
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kegiatan</label>
+                <textarea value={header.kegiatan} onChange={(e) => setHeader({...header, kegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-16" />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Sub Kegiatan</label>
+                <textarea value={header.subKegiatan} onChange={(e) => setHeader({...header, subKegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-16" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">BK Umum</label>
+                  <input type="text" value={header.bkUmum} onChange={(e) => setHeader({...header, bkUmum: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal BK</label>
+                  <input type="text" value={header.bkTanggal} onChange={(e) => setHeader({...header, bkTanggal: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                </div>
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Sudah Terima Dari</label>
+                <textarea value={header.penerimaDuit} onChange={(e) => setHeader({...header, penerimaDuit: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-12" />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (Nama)</label>
+                <input type="text" value={header.pptkName} onChange={(e) => setHeader({...header, pptkName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (NIP)</label>
+                <input type="text" value={header.pptkNip} onChange={(e) => setHeader({...header, pptkNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (Nama)</label>
+                <input type="text" value={header.paName} onChange={(e) => setHeader({...header, paName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (NIP)</label>
+                <input type="text" value={header.paNip} onChange={(e) => setHeader({...header, paNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" />
               </div>
             </div>
           </section>
@@ -419,14 +650,14 @@ export default function App() {
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Bendahara</label>
                 <input 
                   type="text" 
-                  value={header.bendaharaName}
+                  value={header.bendaharaName ?? ''}
                   onChange={(e) => {
                     setHeader({...header, bendaharaName: e.target.value});
                     setSearchTerm(e.target.value);
                     setActivePersonIdForSearch('bendahara');
                   }}
                   onFocus={() => {
-                    setSearchTerm(header.bendaharaName);
+                    setSearchTerm(header.bendaharaName ?? '');
                     setActivePersonIdForSearch('bendahara');
                   }}
                   onBlur={() => {
@@ -465,10 +696,176 @@ export default function App() {
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Bendahara</label>
                 <input 
                   type="text" 
-                  value={header.bendaharaNip}
+                  value={header.bendaharaNip ?? ''}
                   onChange={(e) => setHeader({...header, bendaharaNip: e.target.value})}
                   className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 font-mono" 
                 />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Data Laporan</h2>
+            <div className="space-y-4">
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Dasar (Poin-poin)</label>
+                <div className="space-y-2">
+                  {(header.dasarPoints || []).map((point, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <textarea
+                        value={point}
+                        onChange={(e) => {
+                          const newDasar = [...(header.dasarPoints || [])];
+                          newDasar[idx] = e.target.value;
+                          setHeader({ ...header, dasarPoints: newDasar });
+                        }}
+                        className="flex-1 text-[10px] bg-white/5 border-white/10 rounded-lg p-2 text-white h-12 resize-none"
+                      />
+                      <button 
+                        onClick={() => {
+                          const newDasar = (header.dasarPoints || []).filter((_, i) => i !== idx);
+                          setHeader({ ...header, dasarPoints: newDasar });
+                        }}
+                        className="text-red-400 p-1"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button 
+                    onClick={() => setHeader({ ...header, dasarPoints: [...(header.dasarPoints || []), ''] })}
+                    className="w-full text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-1 rounded-lg uppercase font-bold"
+                  >
+                    + Tambah Dasar
+                  </button>
+                </div>
+              </div>
+
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Hasil (Deskripsi)</label>
+                <textarea 
+                  value={header.hasilDescriptive ?? ''}
+                  onChange={(e) => setHeader({...header, hasilDescriptive: e.target.value})}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl h-20 text-white p-2"
+                />
+              </div>
+
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Hasil (Poin-poin)</label>
+                <div className="space-y-2">
+                  {(header.hasilPoints || []).map((point, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <textarea
+                        value={point}
+                        onChange={(e) => {
+                          const newHasil = [...(header.hasilPoints || [])];
+                          newHasil[idx] = e.target.value;
+                          setHeader({ ...header, hasilPoints: newHasil });
+                        }}
+                        className="flex-1 text-[10px] bg-white/5 border-white/10 rounded-lg p-2 text-white h-12 resize-none"
+                      />
+                      <button 
+                        onClick={() => {
+                          const newHasil = (header.hasilPoints || []).filter((_, i) => i !== idx);
+                          setHeader({ ...header, hasilPoints: newHasil });
+                        }}
+                        className="text-red-400 p-1"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button 
+                    onClick={() => setHeader({ ...header, hasilPoints: [...(header.hasilPoints || []), ''] })}
+                    className="w-full text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-1 rounded-lg uppercase font-bold"
+                  >
+                    + Tambah Poin Hasil
+                  </button>
+                </div>
+              </div>
+
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (Nama)</label>
+                <input 
+                  type="text" 
+                  value={header.inspectorName ?? ''}
+                  onChange={(e) => setHeader({...header, inspectorName: e.target.value})}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
+                />
+              </div>
+              <div className="group">
+                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (NIP)</label>
+                <input 
+                  type="text" 
+                  value={header.inspectorNip ?? ''}
+                  onChange={(e) => setHeader({...header, inspectorNip: e.target.value})}
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Jabatan</label>
+                  <input 
+                    type="text" 
+                    value={header.inspectorJabatan ?? ''}
+                    onChange={(e) => setHeader({...header, inspectorJabatan: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
+                  />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pangkat/Gol</label>
+                  <input 
+                    type="text" 
+                    value={header.inspectorUnit ?? ''}
+                    onChange={(e) => setHeader({...header, inspectorUnit: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Dokumentasi</h2>
+            <div className="space-y-4">
+              <div 
+                className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer group"
+                onClick={() => document.getElementById('photo-upload')?.click()}
+              >
+                <Camera className="mx-auto text-slate-500 group-hover:text-indigo-400 mb-2" size={24} />
+                <p className="text-[10px] text-slate-500 uppercase font-bold">Klik untuk Unggah Foto</p>
+                <input 
+                  id="photo-upload"
+                  type="file" 
+                  multiple 
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    files.forEach(file => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        const base64 = reader.result as string;
+                        setHeader(h => ({ ...h, photos: [...(h.photos || []), base64] }));
+                      };
+                      reader.readAsDataURL(file);
+                    });
+                  }}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                {(header.photos || []).map((photo, idx) => (
+                  <div key={idx} className="relative group rounded-lg overflow-hidden aspect-video bg-white/5">
+                    <img src={photo} className="w-full h-full object-cover" />
+                    <button 
+                      onClick={() => setHeader(h => ({ ...h, photos: (h.photos || []).filter((_, i) => i !== idx) }))}
+                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -501,14 +898,14 @@ export default function App() {
                       </div>
                       <input 
                         placeholder="Nama Lengkap (Cari di Database...)" 
-                        value={p.name}
+                        value={p.name ?? ''}
                         onChange={(e) => {
                           updatePerson(p.id, 'name', e.target.value);
                           setSearchTerm(e.target.value);
                           setActivePersonIdForSearch(p.id);
                         }}
                         onFocus={() => {
-                          setSearchTerm(p.name);
+                          setSearchTerm(p.name ?? '');
                           setActivePersonIdForSearch(p.id);
                         }}
                         onBlur={() => {
@@ -543,12 +940,54 @@ export default function App() {
                     </div>
                     <input 
                       placeholder="NIP" 
-                      value={p.nip}
+                      value={p.nip ?? ''}
                       onChange={(e) => updatePerson(p.id, 'nip', e.target.value)}
                       className="w-full text-[11px] text-slate-400 bg-transparent border-b border-white/10 focus:border-indigo-500 focus:ring-0 p-0 pb-1 font-mono"
                     />
-                    
-                    <div className="mt-4 space-y-3">
+
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <input 
+                          placeholder="Jabatan" 
+                          value={p.jabatan ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'jabatan', e.target.value)}
+                          className="text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300"
+                        />
+                        <input 
+                          placeholder="Unit Kerja" 
+                          value={p.unitKerja ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'unitKerja', e.target.value)}
+                          className="text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300"
+                        />
+                      </div>
+
+                    <div className="mt-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Uraian Riil (Kalimat Penjelas)</label>
+                        <textarea 
+                          placeholder="Kalimat penjelas Pengeluaran Riil..." 
+                          value={p.riilDescription ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'riilDescription', e.target.value)}
+                          className="w-full text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300 h-16 resize-none"
+                        />
+                      </div>
+
+                      <div className="mt-2 flex gap-2">
+                        <button 
+                          onClick={() => {
+                            const newExpenses = [
+                              { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 1, unit: 'Hari', rate: 380000, isRiil: false },
+                              { id: crypto.randomUUID(), description: 'Representasi', quantity: 1, unit: 'Hari', rate: 110000, isRiil: false },
+                              { id: crypto.randomUUID(), description: 'Penginapan', quantity: 1, unit: 'Malam', rate: 250000, isRiil: true },
+                              { id: crypto.randomUUID(), description: 'Transportasi', quantity: 1, unit: 'Layanan', rate: 180000, isRiil: false }
+                            ];
+                            updatePerson(p.id, 'expenses', newExpenses);
+                          }}
+                          className="flex-1 text-[9px] bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20 py-1.5 rounded-lg font-bold uppercase transition-all"
+                        >
+                          Template Biaya Standar
+                        </button>
+                      </div>
+                      
+                      <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Biaya</span>
                         <button 
@@ -561,28 +1000,35 @@ export default function App() {
                         <div key={e.id} className="flex gap-1.5 items-start">
                           <input 
                             placeholder="Desc" 
-                            value={e.description}
+                            value={e.description ?? ''}
                             onChange={(val) => updateExpense(p.id, e.id, 'description', val.target.value)}
                             className="flex-1 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white placeholder-slate-600"
                           />
                           <input 
                             type="number"
-                            value={e.quantity}
+                            value={e.quantity ?? 0}
                             onChange={(val) => updateExpense(p.id, e.id, 'quantity', parseInt(val.target.value) || 0)}
                             className="w-10 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white"
                           />
                           <input 
                             placeholder="Unit"
-                            value={e.unit}
+                            value={e.unit ?? ''}
                             onChange={(val) => updateExpense(p.id, e.id, 'unit', val.target.value)}
                             className="w-12 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white"
                           />
                           <input 
                             type="number"
-                            value={e.rate}
+                            value={e.rate ?? 0}
                             onChange={(val) => updateExpense(p.id, e.id, 'rate', parseInt(val.target.value) || 0)}
                             className="w-20 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-right text-white font-mono"
                           />
+                          <button 
+                            onClick={() => updateExpense(p.id, e.id, 'isRiil', !e.isRiil)}
+                            className={`p-1.5 rounded-lg border transition-all ${e.isRiil ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-white/5 border-white/5 text-slate-600'}`}
+                            title={e.isRiil ? "Item Riil" : "Bukan Item Riil"}
+                          >
+                            <FileText size={10} />
+                          </button>
                           <button 
                             onClick={() => removeExpense(p.id, e.id)}
                             className="text-red-400 hover:text-red-300 p-1.5 transition-colors"
@@ -607,6 +1053,46 @@ export default function App() {
         </div>
 
         <div className="pt-6 border-t border-white/10 mt-auto space-y-3">
+          <div className="bg-white/5 p-1 rounded-xl border border-white/5 mb-2">
+            <div className="grid grid-cols-2 gap-1 text-[8px] uppercase font-bold text-center">
+              <button 
+                onClick={() => setViewMode('kwitansi')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'kwitansi' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Rincian Biaya
+              </button>
+              <button 
+                onClick={() => setViewMode('riil')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'riil' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Pengeluaran Riil
+              </button>
+              <button 
+                onClick={() => setViewMode('pernyataan')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'pernyataan' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Pernyataan
+              </button>
+              <button 
+                onClick={() => setViewMode('laporan')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'laporan' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Laporan
+              </button>
+              <button 
+                onClick={() => setViewMode('foto')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'foto' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Foto
+              </button>
+              <button 
+                onClick={() => setViewMode('kwitansi_asli')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'kwitansi_asli' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
+              >
+                Kwitansi
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={handleReset}
@@ -653,119 +1139,600 @@ export default function App() {
       </div>
 
       {/* Main Preview Area */}
-      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar md:p-12 flex justify-center items-start print:p-0 print:bg-white">
-        <div id="print-area" className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
-          
-          {/* Document Header */}
-          <div className="text-center mb-8 border-b-2 border-black pb-2">
-            <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
-              Belanja Biaya Perjalanan Dinas
-            </h1>
-          </div>
+      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar md:p-12 flex flex-col items-center print:p-0 print:bg-white pb-20">
+        
+        {viewMode === 'kwitansi' && (
+          <div id="print-area" className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
+            
+            {/* Document Header */}
+            <div className="text-center mb-8 border-b-2 border-black pb-2">
+              <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                Belanja Biaya Perjalanan Dinas
+              </h1>
+            </div>
 
-          <div className="space-y-1 mb-6 text-sm">
-            <div className="flex">
-              <span className="w-20 font-bold">ST</span>
-              <span className="mr-1">:</span>
-              <span className="flex-1">{header.st} Tanggal {header.stDate}</span>
-            </div>
-            <div className="flex">
-              <span className="w-20 font-bold">TUJUAN</span>
-              <span className="mr-1">:</span>
-              <span className="flex-1 leading-tight">
-                {header.tujuan} pada Tanggal {header.tujuanStartDate} s.d {header.tujuanEndDate}
-              </span>
-            </div>
-          </div>
-
-          {/* Table for each person */}
-          {persons.map((person, index) => (
-            <div key={person.id} className="mb-6 break-inside-avoid">
-              <table className="w-full border-collapse border-2 border-black text-[11px]">
-                <thead>
-                  <tr className="bg-neutral-100 uppercase font-bold text-center border-b-2 border-black transition-colors">
-                    <th className="border-r-2 border-black w-8 py-2 text-[10px]">No</th>
-                    <th className="border-r-2 border-black w-48 py-2 text-[10px] font-black">Nama / NIP</th>
-                    <th className="border-r-2 border-black py-2 text-[10px]">Rincian Komponen Biaya Perjalanan Dinas</th>
-                    <th className="border-r-2 border-black w-24 py-2 text-[10px]">Jumlah (Rp)</th>
-                    <th className="w-28 py-2 text-[10px]">Tanda Terima</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-white">
-                    <td className="border-r-2 border-black text-center align-top py-2 font-bold">{index + 1}</td>
-                    <td className="border-r-2 border-black align-top p-2 leading-tight">
-                      <div className="font-bold underline mb-1 uppercase text-xs">{person.name}</div>
-                      <div className="uppercase">NIP. {person.nip}</div>
-                    </td>
-                    <td className="border-r-2 border-black align-top">
-                      <table className="w-full">
-                        <tbody>
-                          {person.expenses.map((exp, idx) => (
-                            <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-200" : ""}>
-                              <td className="p-1 w-28">{exp.description}</td>
-                              <td className="p-1 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
-                              <td className="p-1 w-4 text-center text-neutral-300">x</td>
-                              <td className="p-1 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
-                              <td className="p-1 w-4 text-center text-neutral-300">=</td>
-                              <td className="p-1 text-right font-medium">
-                                {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </td>
-                    <td className="border-r-2 border-black text-right align-top py-2 px-2 text-[11px] font-black">
-                      {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
-                    </td>
-                    <td className="align-middle text-center p-2 text-neutral-300 relative">
-                     <span className="block border-b border-dotted border-neutral-400 w-full mt-4"></span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ))}
-
-          {/* Grand Total Bar */}
-          <div className="bg-neutral-100 border-2 border-black mb-10 break-inside-avoid shadow-sm">
-            <div className="p-4 flex justify-between items-center border-b border-black">
-              <span className="italic font-black text-lg tracking-wider uppercase">Total Dibayarkan Sejumlah Rp</span>
-              <span className="font-black text-3xl italic">{formatCurrency(grandTotal).replace('Rp ', '')}</span>
-            </div>
-            <div className="p-2 px-4 bg-white italic font-bold text-[11px] uppercase tracking-tight">
-              # {terbilang(grandTotal)} Rupiah #
-            </div>
-          </div>
-
-          {/* Signatures */}
-          <div className="grid grid-cols-2 gap-10 mt-10 text-sm break-inside-avoid px-8">
-            <div className="text-center space-y-16">
-              <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
-                <span>Bendahara,</span>
+            <div className="space-y-1 mb-6 text-sm">
+              <div className="flex">
+                <span className="w-20 font-bold">ST</span>
+                <span className="mr-1">:</span>
+                <span className="flex-1">{header.st} Tanggal {header.stDate}</span>
               </div>
-              <div className="flex flex-col items-center">
-                <span className="font-bold underline uppercase text-[15px]">{header.bendaharaName}</span>
-                <span className="uppercase text-xs">NIP. {header.bendaharaNip}</span>
+              <div className="flex">
+                <span className="w-20 font-bold">TUJUAN</span>
+                <span className="mr-1">:</span>
+                <span className="flex-1 leading-tight">
+                  {header.tujuan} pada Tanggal {header.tujuanStartDate} s.d {header.tujuanEndDate}
+                </span>
               </div>
             </div>
 
-            <div className="text-center space-y-16">
-              <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
-                <span className="text-[11px] mb-1">{header.place}, {header.printDate}</span>
-                <span>Pembuat Daftar,</span>
+            {/* Table for each person */}
+            {persons.map((person, index) => (
+              <div key={person.id} className="mb-6 break-inside-avoid">
+                <table className="w-full border-collapse border-2 border-black text-[11px]">
+                  <thead>
+                    <tr className="bg-neutral-100 uppercase font-bold text-center border-b-2 border-black transition-colors">
+                      <th className="border-r-2 border-black w-8 py-2 text-[10px]">No</th>
+                      <th className="border-r-2 border-black w-48 py-2 text-[10px] font-black">Nama / NIP</th>
+                      <th className="border-r-2 border-black py-2 text-[10px]">Rincian Komponen Biaya Perjalanan Dinas</th>
+                      <th className="border-r-2 border-black w-24 py-2 text-[10px]">Jumlah (Rp)</th>
+                      <th className="w-28 py-2 text-[10px]">Tanda Terima</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-white">
+                      <td className="border-r-2 border-black text-center align-top py-2 font-bold">{index + 1}</td>
+                      <td className="border-r-2 border-black align-top p-2 leading-tight">
+                        <div className="font-bold underline mb-1 uppercase text-xs">{person.name}</div>
+                        <div className="uppercase">NIP. {person.nip}</div>
+                      </td>
+                      <td className="border-r-2 border-black align-top">
+                        <table className="w-full">
+                          <tbody>
+                            {person.expenses.map((exp, idx) => (
+                              <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-200" : ""}>
+                                <td className="p-1 w-28">{exp.description}</td>
+                                <td className="p-1 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
+                                <td className="p-1 w-4 text-center text-neutral-300">x</td>
+                                <td className="p-1 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
+                                <td className="p-1 w-4 text-center text-neutral-300">=</td>
+                                <td className="p-1 text-right font-medium">
+                                  {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                      <td className="border-r-2 border-black text-right align-top py-2 px-2 text-[11px] font-black">
+                        {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
+                      </td>
+                      <td className="align-middle text-center p-2 text-neutral-300 relative">
+                      <span className="block border-b border-dotted border-neutral-400 w-full mt-4"></span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div className="flex flex-col items-center">
-                <span className="font-bold underline uppercase text-[15px]">{persons[0]?.name || '......................................'}</span>
-                <span className="uppercase text-xs">NIP. {persons[0]?.nip || '......................................'}</span>
+            ))}
+
+            {/* Grand Total Bar */}
+            <div className="bg-neutral-100 border-2 border-black mb-10 break-inside-avoid shadow-sm">
+              <div className="p-4 flex justify-between items-center border-b border-black">
+                <span className="italic font-black text-lg tracking-wider uppercase">Total Dibayarkan Sejumlah Rp</span>
+                <span className="font-black text-3xl italic">{formatCurrency(grandTotal).replace('Rp ', '')}</span>
+              </div>
+              <div className="p-2 px-4 bg-white italic font-bold text-[11px] uppercase tracking-tight">
+                # {terbilang(grandTotal)} Rupiah #
+              </div>
+            </div>
+
+            {/* Signatures */}
+            <div className="grid grid-cols-2 gap-10 mt-10 text-sm break-inside-avoid px-8">
+              <div className="text-center space-y-16">
+                <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+                  <span>Bendahara,</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="font-bold underline uppercase text-[15px]">{header.bendaharaName}</span>
+                  <span className="uppercase text-xs">NIP. {header.bendaharaNip}</span>
+                </div>
+              </div>
+
+              <div className="text-center space-y-16">
+                <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+                  <span className="text-[11px] mb-1">{header.place}, {header.printDate}</span>
+                  <span>Pembuat Daftar,</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="font-bold underline uppercase text-[15px]">
+                    {header.listMakerName || '......................................'}
+                  </span>
+                  <span className="uppercase text-xs">
+                    NIP. {header.listMakerNip || '......................................'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="mt-20 text-[10px] text-neutral-400 no-print border-t pt-4">
+        {viewMode === 'riil' && (
+          /* DAFTAR PENGELUARAN RIIL PREVIEW */
+          <div className="space-y-10 w-full flex flex-col items-center">
+            {persons.map((person) => (
+              <div key={person.id} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page">
+                <div className="text-center mb-8">
+                  <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                    SURAT PERNYATAAN DAFTAR PENGELUARAN RIIL
+                  </h1>
+                </div>
+
+                <div className="space-y-1 mb-6 text-[13px]">
+                  <table className="w-full">
+                    <tbody>
+                      <tr>
+                        <td className="w-32 py-0.5 whitespace-nowrap align-top">Nama</td>
+                        <td className="w-4 align-top">:</td>
+                        <td className="font-bold">
+                          <input 
+                            className="w-full font-bold bg-transparent border-none focus:ring-0 p-0" 
+                            value={person.name ?? ''} 
+                            onChange={(e) => updatePerson(person.id, 'name', e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="w-32 py-0.5 whitespace-nowrap align-top">NIP.</td>
+                        <td className="w-4 align-top">:</td>
+                        <td>
+                          <input 
+                            className="w-full bg-transparent border-none focus:ring-0 p-0" 
+                            value={person.nip ?? ''} 
+                            onChange={(e) => updatePerson(person.id, 'nip', e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="w-32 py-0.5 whitespace-nowrap align-top">Jabatan</td>
+                        <td className="w-4 align-top">:</td>
+                        <td>
+                          <input 
+                            className="w-full bg-transparent border-none focus:ring-0 p-0" 
+                            value={person.jabatan ?? ''} 
+                            onChange={(e) => updatePerson(person.id, 'jabatan', e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="w-32 py-0.5 whitespace-nowrap align-top">Unit Kerja/SKPI</td>
+                        <td className="w-4 align-top">:</td>
+                        <td>
+                          <input 
+                            className="w-full bg-transparent border-none focus:ring-0 p-0" 
+                            value={person.unitKerja ?? ''} 
+                            onChange={(e) => updatePerson(person.id, 'unitKerja', e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="text-[13px] leading-relaxed mb-6 text-justify">
+                  Berdasarkan Surat Perjalanan Dinas (SPD) tanggal {header.spdDate || '....................'}, Nomor : {header.spdNumber || '....................'}, dengan ini kami menyatakan dengan sepenuhnya :
+                </div>
+
+                <div className="text-[13px] mb-4 flex gap-1">
+                  <span className="whitespace-nowrap">1.</span>
+                  <textarea 
+                    className="w-full bg-transparent border-none focus:ring-0 p-0 h-16 resize-none align-top leading-relaxed" 
+                    value={person.riilDescription ?? ''} 
+                    onChange={(e) => updatePerson(person.id, 'riilDescription', e.target.value)}
+                  />
+                </div>
+
+                <table className="w-full border-collapse border-2 border-black text-[13px] mb-6">
+                  <thead>
+                    <tr className="border-b-2 border-black font-bold text-center h-10">
+                      <th className="border-r-2 border-black w-12">No.</th>
+                      <th className="border-r-2 border-black">U r a i a n</th>
+                      <th className="w-48 text-center px-2">Jumlah</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {person.expenses.filter(e => e.isRiil).length === 0 ? (
+                      <tr className="border-b border-black">
+                        <td colSpan={3} className="text-center py-10 italic text-neutral-400">Pilih item "Riil" di menu Edit (klik ikon dokumen pada tiap item biaya)</td>
+                      </tr>
+                    ) : person.expenses.filter(e => e.isRiil).map((exp, riilIdx) => (
+                      <tr key={exp.id} className="border-b border-black">
+                        <td className="border-r-2 border-black text-center py-2">{riilIdx + 1}.</td>
+                        <td className="border-r-2 border-black px-3 py-2">
+                          <div className="flex gap-1 items-center text-[13px]">
+                            <input 
+                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] flex-1"
+                              value={exp.description ?? ''}
+                              onChange={(e) => updateExpense(person.id, exp.id, 'description', e.target.value)}
+                            />
+                            <span>x</span>
+                            <input 
+                              type="number"
+                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-6 text-center"
+                              value={exp.quantity ?? 0}
+                              onChange={(e) => updateExpense(person.id, exp.id, 'quantity', parseInt(e.target.value) || 0)}
+                            />
+                            <input 
+                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-12"
+                              value={exp.unit ?? ''}
+                              onChange={(e) => updateExpense(person.id, exp.id, 'unit', e.target.value)}
+                            />
+                            <span className="whitespace-nowrap px-1 font-bold">x 30%</span>
+                            <div className="hidden">
+                              <input 
+                                type="number"
+                                value={exp.rate ?? 0}
+                                onChange={(e) => updateExpense(person.id, exp.id, 'rate', parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-between w-full">
+                            <span>Rp.</span>
+                            <span className="font-mono">{formatCurrency((exp.quantity * exp.rate) * 0.3).replace('Rp ', '')}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold bg-neutral-50 h-10">
+                      <td colSpan={2} className="border-r-2 border-black text-center uppercase tracking-widest">Jumlah</td>
+                      <td className="px-3">
+                         <div className="flex justify-between w-full">
+                            <span>Rp.</span>
+                            <span className="font-mono">{formatCurrency(person.expenses.filter(e => e.isRiil).reduce((s, e) => s + (e.quantity * e.rate * 0.3), 0)).replace('Rp ', '')}</span>
+                         </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="text-[13px] space-y-4 leading-relaxed text-justify mb-10">
+                  <p>
+                    2. Jumlah uang tersebut pada angka 1 diatas benar-benar dikeluarkan untuk pelaksanaan perjalanan dinas dimaksud dan apabila dikemudian hari terdapat kelebihan atas pembayaran, kami bersedia untuk menyetorkan kembali kelebihan tersebut ke Kas Daerah.
+                  </p>
+                  <p>
+                    Demikian pernyataan ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-end text-[13px] px-10">
+                  <div className="text-center">
+                    <div className="mb-24">
+                      {header.place}, {header.printDate} <br/>
+                      Yang melakukan perjalanan dinas,
+                    </div>
+                    <div className="font-bold underline uppercase">{person.name}</div>
+                    <div className="uppercase">NIP. {person.nip}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'pernyataan' && (
+          /* SURAT PERNYATAAN / SPTJM PREVIEW */
+          <div className="space-y-10 w-full flex flex-col items-center">
+            {persons.map((person) => (
+              <div key={person.id} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-20 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page flex flex-col">
+                <div className="text-center mb-10">
+                  <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                    SURAT PERNYATAAN
+                  </h1>
+                </div>
+
+                <div className="text-[14px] mb-4">
+                  Yang bertanda tangan di bawah ini :
+                </div>
+
+                <div className="space-y-1 mb-8 text-[14px] ml-4">
+                  <table className="w-full">
+                    <tbody>
+                      <tr>
+                        <td className="w-40 py-1">Nama</td>
+                        <td className="w-4">:</td>
+                        <td className="font-bold uppercase">{person.name || '......................................'}</td>
+                      </tr>
+                      <tr>
+                        <td className="w-40 py-1">NIP.</td>
+                        <td className="w-4">:</td>
+                        <td className="uppercase">{person.nip || '......................................'}</td>
+                      </tr>
+                      <tr>
+                        <td className="w-40 py-1">Jabatan</td>
+                        <td className="w-4">:</td>
+                        <td className="uppercase">{person.jabatan || '......................................'}</td>
+                      </tr>
+                      <tr>
+                        <td className="w-40 py-1">Unit Kerja/SKPD</td>
+                        <td className="w-4">:</td>
+                        <td className="uppercase">{person.unitKerja || '......................................'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="text-[14px] leading-relaxed mb-8 text-justify">
+                  Berdasarkan Surat Perjalanan Dinas (SPD) Nomor : <span className="font-bold">{header.spdNumber || '......................................'}</span> tanggal <span className="font-bold">{header.spdDate || '......................................'}</span>, dengan ini menyatakan dengan sesungguhnya bahwa biaya-biaya yang saya keluarkan/pertanggungjawabkan berdasarkan bukti-bukti yang terlampir menjadi tanggung jawab mutlak saya sepenuhnya.
+                </div>
+
+                <div className="text-[14px] leading-relaxed text-justify mb-20">
+                  Demikian Surat Pernyataan ini saya buat, dengan sebenarnya dan apabila di kemudian hari ternyata Surat Pernyataan ini tidak benar, saya bertanggungjawab penuh dan bersedia di proses sesuai ketentuan hukum yang berlaku.
+                </div>
+
+                <div className="flex flex-col items-end text-[14px] mt-12">
+                  <div className="text-center w-64">
+                    <div className="mb-20">
+                      {header.place}, {header.printDate} <br/>
+                    </div>
+                    <div className="font-bold underline uppercase">{person.name || '......................................'}</div>
+                    <div className="uppercase">NIP. {person.nip || '......................................'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'laporan' && (
+          /* LAPORAN PERJALANAN DINAS PREVIEW */
+          <div className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
+            <div className="text-center mb-8">
+              <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                LAPORAN PERJALANAN DINAS
+              </h1>
+            </div>
+
+            <div className="space-y-4 text-[13px] leading-relaxed">
+              <div className="flex">
+                <span className="w-24">Dasar</span>
+                <span className="w-4">:</span>
+                <div className="flex-1 space-y-1">
+                  {(header.dasarPoints || []).map((point, idx) => (
+                    <div key={idx} className="flex gap-2">
+                       <span>{idx + 1}.</span>
+                       <p className="flex-1">{point}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex">
+                <span className="w-24">Tujuan</span>
+                <span className="w-4">:</span>
+                <div className="flex-1">{header.tujuan}</div>
+              </div>
+
+              <div className="flex">
+                <span className="w-24">Waktu</span>
+                <span className="w-4">:</span>
+                <div className="flex-1">Tanggal {header.tujuanStartDate} s.d {header.tujuanEndDate}</div>
+              </div>
+
+              <div className="flex">
+                <span className="w-24">Tempat</span>
+                <span className="w-4">:</span>
+                <div className="flex-1">{header.place}</div>
+              </div>
+
+              <div className="flex">
+                <span className="w-24">Hasil</span>
+                <span className="w-4">:</span>
+                <div className="flex-1">
+                  <p>{header.hasilDescriptive}</p>
+                  <div className="mt-2 space-y-2">
+                    {(header.hasilPoints || []).map((point, idx) => (
+                      <div key={idx} className="flex gap-2">
+                         <span>{idx + 1}.</span>
+                         <p className="flex-1">{point}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-4">Demikian Laporan Perjalanan Dinas ini dibuat untuk diketahui sebagaimana mestinya.</p>
+            </div>
+
+            <div className="mt-16 grid grid-cols-2 text-[13px]">
+              <div className="text-center">
+                <p>Mengetahui</p>
+                <p className="font-bold uppercase mb-20">{header.inspectorJabatan}</p>
+                <p className="font-bold underline uppercase">{header.inspectorName}</p>
+                <p>{header.inspectorUnit}</p>
+                <p>NIP. {header.inspectorNip}</p>
+              </div>
+              <div className="text-center">
+                <p>{header.place}, {header.printDate}</p>
+                <p className="mb-4">Yang melakukan perjalanan dinas :</p>
+                <div className="space-y-6 text-left inline-block">
+                  {persons.map((person, idx) => (
+                    <div key={person.id} className="flex flex-col gap-1">
+                      <div className="flex gap-2 items-center">
+                        <span className="w-4">{idx + 1}.</span>
+                        <div className="flex-1 min-w-[150px]">
+                          <p className="font-bold underline uppercase whitespace-nowrap">{person.name}</p>
+                          <p className="text-[11px]">NIP. {person.nip}</p>
+                        </div>
+                        <div className="border-b border-black w-24 ml-4 h-1"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'foto' && (
+          /* FOTO DOKUMENTASI PREVIEW */
+          <div className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
+            <div className="text-center mb-8">
+              <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                FOTO DOKUMENTASI KEGIATAN
+              </h1>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8">
+              {(header.photos || []).length > 0 ? (
+                (header.photos || []).map((photo, idx) => (
+                  <div key={idx} className="w-full border-2 border-black p-1">
+                    <img src={photo} className="w-full h-auto" alt={`Dokumentasi ${idx + 1}`} />
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-20 text-slate-300 italic border-2 border-dashed border-slate-200">
+                  Belum ada foto dokumentasi yang diunggah.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'kwitansi_asli' && (
+          /* KWITANSI FORMAL PREVIEW */
+          <div className="space-y-6 w-full flex flex-col items-center">
+            {persons.map((person) => {
+              const pTotal = person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0);
+              return (
+                <div key={person.id} className="bg-white shadow-2xl p-4 md:p-12 w-full max-w-[210mm] min-h-[148mm] print:shadow-none print:max-w-none print:w-full print:p-8 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page flex flex-col">
+                  {/* Header Info */}
+                  <div className="grid grid-cols-2 text-[12px] mb-2">
+                    <div className="space-y-0.5">
+                      <div className="flex">
+                        <span className="w-32">Tahun Anggaran</span>
+                        <span className="mr-2">:</span>
+                        <span>{header.tahunAnggaran}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32">Kegiatan</span>
+                        <span className="mr-2">:</span>
+                        <span className="flex-1">{header.kegiatan}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32">Sub Kegiatan</span>
+                        <span className="mr-2">:</span>
+                        <span className="flex-1">{header.subKegiatan}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32">Kode Rekening</span>
+                        <span className="mr-2">:</span>
+                        <span>{header.kodeRekening}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="w-64 space-y-0.5">
+                        <div className="flex">
+                          <span className="w-24">BK. Umum</span>
+                          <span className="mr-2">:</span>
+                          <span className="flex-1 border-b border-dotted border-black">{header.bkUmum}</span>
+                        </div>
+                        <div className="flex mt-4">
+                          <span className="w-24">Tanggal</span>
+                          <span className="mr-2">:</span>
+                          <span className="flex-1 border-b border-dotted border-black">{header.bkTanggal}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-center mb-2">
+                    <h2 className="text-lg font-bold uppercase underline">KWITANSI</h2>
+                  </div>
+
+                  <div className="space-y-1.5 text-[13px] mb-4">
+                    <div className="flex items-start">
+                      <span className="w-36 shrink-0">Sudah Terima Dari</span>
+                      <span className="mr-3">:</span>
+                      <div className="flex-1 font-medium leading-tight">{header.penerimaDuit}</div>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="w-36 shrink-0">Uang sebanyak</span>
+                      <span className="mr-3">:</span>
+                      <div className="flex-1 italic font-bold text-base leading-tight uppercase bg-gray-50 px-1">
+                        {terbilang(pTotal)} Rupiah
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="w-36 shrink-0">Untuk Pembayaran</span>
+                      <span className="mr-3">:</span>
+                      <div className="flex-1 leading-tight">
+                        Belanja Perjalanan Dinas Biasa - {header.tujuan} yang dilaksanakan pada Tgl {header.tujuanStartDate} s/d {header.tujuanEndDate} di {header.place}.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex mb-6">
+                     <div className="border border-black py-1 px-4 text-base font-black italic flex gap-4 items-center bg-gray-50">
+                        <span>Terbilang Rp.</span>
+                        <span>{formatCurrency(pTotal).replace('Rp ', '')} ,-</span>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 text-[12px] gap-y-8">
+                    <div className="text-center flex flex-col items-center">
+                      <div className="h-12 flex flex-col justify-end">
+                        <p>Mengetahui :</p>
+                        <p className="uppercase">PPTK,</p>
+                      </div>
+                      <div className="mt-10">
+                        <p className="font-bold underline uppercase">{header.pptkName}</p>
+                        <p className="uppercase whitespace-nowrap">NIP. {header.pptkNip}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-center flex flex-col items-center">
+                      <div className="h-12 flex flex-col justify-end">
+                        <p>{header.place}, {header.printDate}</p>
+                        <p className="mt-1 text-xs">Tanda terima uang,</p>
+                      </div>
+                      <div className="mt-10">
+                        <p className="font-bold underline uppercase">{person.name}</p>
+                        <p className="uppercase whitespace-nowrap">NIP. {person.nip}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-center flex flex-col items-center">
+                      <div className="h-12 flex flex-col justify-end">
+                        <p>Setuju dibayar :</p>
+                        <p className="uppercase">PENGGUNA ANGGARAN</p>
+                      </div>
+                      <div className="mt-10">
+                        <p className="font-bold underline uppercase">{header.paName}</p>
+                        <p className="uppercase whitespace-nowrap">NIP. {header.paNip}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-center flex flex-col items-center">
+                      <div className="h-12 flex flex-col justify-end">
+                        <p>Lunas dibayar :</p>
+                        <p className="uppercase leading-tight">Bendahara Pengeluaran,</p>
+                      </div>
+                      <div className="mt-10">
+                        <p className="font-bold underline uppercase">{header.bendaharaName}</p>
+                        <p className="uppercase whitespace-nowrap">NIP. {header.bendaharaNip}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-20 text-[10px] text-neutral-400 no-print border-t pt-4 max-w-[210mm] w-full text-center">
             * Gunakan browser Chrome atau Edge untuk hasil cetak terbaik. Aktifkan "Backround Graphics" di menu printer.
-          </div>
         </div>
       </div>
 
