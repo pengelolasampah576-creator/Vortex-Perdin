@@ -109,7 +109,7 @@ interface DocHeader {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
-  const [viewMode, setViewMode] = useState<'kwitansi' | 'riil' | 'pernyataan' | 'laporan' | 'foto' | 'kwitansi_asli'>('kwitansi');
+  const [viewMode, setViewMode] = useState<'sampul' | 'kwitansi' | 'riil' | 'pernyataan' | 'laporan' | 'foto' | 'kwitansi_asli'>('sampul');
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1056,6 +1056,12 @@ export default function App() {
           <div className="bg-white/5 p-1 rounded-xl border border-white/5 mb-2">
             <div className="grid grid-cols-2 gap-1 text-[8px] uppercase font-bold text-center">
               <button 
+                onClick={() => setViewMode('sampul')}
+                className={`py-2 rounded-lg transition-all ${viewMode === 'sampul' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'} col-span-2`}
+              >
+                Sampul Laporan
+              </button>
+              <button 
                 onClick={() => setViewMode('kwitansi')}
                 className={`py-2 rounded-lg transition-all ${viewMode === 'kwitansi' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
               >
@@ -1141,6 +1147,62 @@ export default function App() {
       {/* Main Preview Area */}
       <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar md:p-12 flex flex-col items-center print:p-0 print:bg-white pb-20">
         
+        {viewMode === 'sampul' && (
+          /* SAMPUL LAPORAN PREVIEW */
+          <div className="w-full flex flex-col items-center">
+            <div className="bg-white shadow-2xl p-16 md:p-24 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-20 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col items-center border-[12px] border-double border-slate-100 print:border-none relative">
+              
+              {/* Decorative Corner Elements */}
+              <div className="absolute top-10 left-10 w-20 h-20 border-t-2 border-l-2 border-slate-200 print:hidden"></div>
+              <div className="absolute top-10 right-10 w-20 h-20 border-t-2 border-r-2 border-slate-200 print:hidden"></div>
+              <div className="absolute bottom-10 left-10 w-20 h-20 border-b-2 border-l-2 border-slate-200 print:hidden"></div>
+              <div className="absolute bottom-10 right-10 w-20 h-20 border-b-2 border-r-2 border-slate-200 print:hidden"></div>
+
+              <div className="text-center space-y-6 flex-1 flex flex-col items-center justify-center w-full">
+                <div className="space-y-4 mb-12">
+                  <h1 className="text-2xl font-black uppercase tracking-tight text-slate-800 leading-tight">
+                    {header.tujuan}
+                  </h1>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.3em] text-slate-400">
+                    Laporan Perjalanan Dinas
+                  </h2>
+                </div>
+
+                <div className="w-24 h-1 bg-indigo-500 mb-12 rounded-full"></div>
+
+                <div className="space-y-8 w-full max-w-lg">
+                  <div className="space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Pelaksana:</p>
+                    <div className="space-y-2">
+                       {persons.map((p, idx) => (
+                         <p key={p.id} className="text-base font-bold text-slate-800">
+                           {idx + 1}. {p.name}
+                         </p>
+                       ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full mt-auto pt-20 flex flex-col items-center space-y-12">
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-bold tracking-[0.3em] uppercase text-slate-400">Tahun Anggaran</p>
+                  <p className="text-3xl font-black text-indigo-600">{header.tahunAnggaran}</p>
+                </div>
+
+                <div className="text-center space-y-1 border-t border-slate-100 pt-8 w-full max-w-sm">
+                  <p className="text-base font-black uppercase tracking-widest text-slate-800">
+                    {header.penerimaDuit.replace('Bendahara Pengeluaran ', '')}
+                  </p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
+                    Kabupaten Tabalong
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {viewMode === 'kwitansi' && (
           <div id="print-area" className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
             
