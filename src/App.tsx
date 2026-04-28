@@ -1585,20 +1585,18 @@ export default function App() {
                 </h1>
               </div>
 
-              <div className="flex-1 flex flex-col gap-6">
+              <div className="flex flex-col gap-6">
                 {(header.photos || []).length > 0 ? (
                   (header.photos || []).map((photo, idx) => (
-                    <div key={idx} className="w-full flex-1 flex items-center justify-center border-2 border-black p-2 bg-gray-50 overflow-hidden min-h-[300px]">
+                    <div key={idx} className="w-full flex items-center justify-center border-2 border-black p-2 bg-gray-50 overflow-hidden h-[300px]">
                       <img src={photo} className="max-w-full max-h-full object-contain" alt={`Dokumentasi ${idx + 1}`} />
                     </div>
                   ))
                 ) : (
-                  <div className="flex-1 flex items-center justify-center text-slate-300 italic border-2 border-dashed border-slate-200">
+                  <div className="py-20 flex items-center justify-center text-slate-300 italic border-2 border-dashed border-slate-200">
                     Belum ada foto dokumentasi yang diunggah.
                   </div>
                 )}
-                {/* Fallback space if few photos */}
-                {(header.photos || []).length === 1 && <div className="flex-1"></div>}
               </div>
             </div>
           </div>
