@@ -1577,26 +1577,41 @@ export default function App() {
 
         {viewMode === 'foto' && (
           /* FOTO DOKUMENTASI PREVIEW */
-          <div className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
-            <div className="text-center mb-8">
-              <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
-                FOTO DOKUMENTASI KEGIATAN
-              </h1>
-            </div>
+          <div className="space-y-8 w-full flex flex-col items-center">
+            {(() => {
+              const photoPairs = [];
+              const photos = header.photos || [];
+              for (let i = 0; i < photos.length; i += 2) {
+                photoPairs.push(photos.slice(i, i + 2));
+              }
 
-            <div className="grid grid-cols-1 gap-8">
-              {(header.photos || []).length > 0 ? (
-                (header.photos || []).map((photo, idx) => (
-                  <div key={idx} className="w-full border-2 border-black p-1">
-                    <img src={photo} className="w-full h-auto" alt={`Dokumentasi ${idx + 1}`} />
+              if (photoPairs.length === 0) {
+                return (
+                  <div className="bg-white shadow-2xl p-14 w-full max-w-[210mm] min-h-[297mm] flex items-center justify-center text-slate-300 italic border-2 border-dashed border-slate-200 rounded-[40px]">
+                    Belum ada foto dokumentasi yang diunggah.
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-20 text-slate-300 italic border-2 border-dashed border-slate-200">
-                  Belum ada foto dokumentasi yang diunggah.
+                );
+              }
+
+              return photoPairs.map((pair, pageIdx) => (
+                <div key={pageIdx} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page flex flex-col">
+                  <div className="text-center mb-12">
+                    <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
+                      FOTO DOKUMENTASI KEGIATAN
+                    </h1>
+                  </div>
+
+                  <div className="flex-1 flex flex-col justify-around gap-8">
+                    {pair.map((photo, imgIdx) => (
+                      <div key={imgIdx} className="w-full flex-1 flex items-center justify-center border-2 border-black p-2 bg-gray-50 overflow-hidden">
+                        <img src={photo} className="max-w-full max-h-full object-contain" alt={`Dokumentasi Page ${pageIdx + 1} Image ${imgIdx + 1}`} />
+                      </div>
+                    ))}
+                    {pair.length === 1 && <div className="flex-1"></div>}
+                  </div>
                 </div>
-              )}
-            </div>
+              ));
+            })()}
           </div>
         )}
 
