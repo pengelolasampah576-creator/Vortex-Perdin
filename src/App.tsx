@@ -89,6 +89,7 @@ interface DocHeader {
   bendaharaName: string;
   bendaharaNip: string;
   place: string;
+  signingPlace: string;
   printDate: string;
   listMakerName: string;
   listMakerNip: string;
@@ -133,7 +134,8 @@ export default function App() {
     tujuanEndDate: '18 Oktober 2025',
     bendaharaName: 'Sumiati. SE',
     bendaharaNip: '19801130 200701 2 006',
-    place: 'Tanjung',
+    place: 'Banjarbaru',
+    signingPlace: 'Tanjung',
     printDate: '20 Oktober 2025',
     listMakerName: 'Wahyu Gunawan, S.Pd.',
     listMakerNip: '19890630 202521 1 045',
@@ -454,7 +456,7 @@ export default function App() {
                     />
                   </div>
                   <div className="group">
-                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Kota/Tempat</label>
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tempat Acara</label>
                     <input 
                       type="text" 
                       value={header.place ?? ''}
@@ -514,14 +516,25 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tanggal Cetak (Rincian Biaya)</label>
-                  <input 
-                    type="text" 
-                    value={header.printDate ?? ''}
-                    onChange={(e) => setHeader({...header, printDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4 font-bold text-indigo-300" 
-                  />
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tempat Tanda Tangan</label>
+                    <input 
+                      type="text" 
+                      value={header.signingPlace ?? ''}
+                      onChange={(e) => setHeader({...header, signingPlace: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4 font-bold text-indigo-300" 
+                    />
+                  </div>
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tanggal Cetak</label>
+                    <input 
+                      type="text" 
+                      value={header.printDate ?? ''}
+                      onChange={(e) => setHeader({...header, printDate: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4 font-bold text-indigo-300" 
+                    />
+                  </div>
                 </div>
 
                 <div className="group relative">
@@ -1403,7 +1416,7 @@ export default function App() {
 
               <div className="text-center space-y-12">
                 <div className="font-medium min-h-[2.5rem] flex flex-col justify-end pb-1">
-                  <span className="text-[11px] mb-1">{header.place}, {header.printDate}</span>
+                  <span className="text-[11px] mb-1">{header.signingPlace}, {header.printDate}</span>
                   <span>Pembuat Daftar,</span>
                 </div>
                 <div className="flex flex-col items-center">
@@ -1580,7 +1593,7 @@ export default function App() {
                 <div className="flex flex-col items-end text-[13px] px-10">
                   <div className="text-center">
                     <div className="mb-16">
-                      {header.place}, {header.printDate} <br/>
+                      {header.signingPlace}, {header.printDate} <br/>
                       Yang melakukan perjalanan dinas,
                     </div>
                     <div className="font-bold underline uppercase">{person.name}</div>
@@ -1645,7 +1658,7 @@ export default function App() {
                 <div className="flex flex-col items-end text-[14px] mt-12">
                   <div className="text-center w-64">
                     <div className="mb-20">
-                      {header.place}, {header.printDate} <br/>
+                      {header.signingPlace}, {header.printDate} <br/>
                     </div>
                     <div className="font-bold underline uppercase">{person.name || '......................................'}</div>
                     <div className="uppercase">NIP. {person.nip || '......................................'}</div>
@@ -1725,7 +1738,7 @@ export default function App() {
                 <p>NIP. {header.inspectorNip}</p>
               </div>
               <div className="text-center">
-                <p>{header.place}, {header.printDate}</p>
+                <p>{header.signingPlace}, {header.printDate}</p>
                 <p className="mb-4">Yang melakukan perjalanan dinas :</p>
                 <div className="space-y-6 text-left inline-block">
                   {persons.map((person, idx) => (
@@ -1864,7 +1877,7 @@ export default function App() {
 
                 <div className="text-center flex flex-col items-center">
                   <div className="h-12 flex flex-col justify-end">
-                    <p>{header.place}, {header.printDate}</p>
+                    <p>{header.signingPlace}, {header.printDate}</p>
                     <p className="mt-1 text-sm">Pembuat daftar,</p>
                   </div>
                   <div className="mt-10">
