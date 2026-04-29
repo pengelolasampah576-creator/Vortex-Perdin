@@ -14,14 +14,17 @@ import {
   FileText,
   UserPlus,
   Search,
-  Download,
   RotateCcw,
   CheckCircle2,
-  Camera
+  Camera,
+  Edit3,
+  Eye,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { STAFF_DATABASE } from './constants';
-import * as XLSX from 'xlsx';
+import html2pdf from 'html2pdf.js';
 
 // --- Utilities ---
 
@@ -70,6 +73,9 @@ interface Person {
   expenses: ExpenseItem[];
   ket: string;
   riilDescription: string;
+  spdNumber: string;
+  spdDate: string;
+  riilPercentage: number;
 }
 
 interface DocHeader {
@@ -113,6 +119,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [sidebarWidth, setSidebarWidth] = useState<'standard' | 'wide'>('standard');
 
   const STORAGE_KEY = 'vortex_perdin_v1';
 
@@ -131,7 +138,7 @@ export default function App() {
     listMakerName: 'Wahyu Gunawan, S.Pd.',
     listMakerNip: '19890630 202521 1 045',
     dasarPoints: [
-      'Lembar Disposisi dan Nota Dinas dari Bupati Tabalong Kabupaten Tabalong : B-46/INSP/000.1.2.3/I/2026 Tgl: 29 Januari 2026',
+      'Lembar Disposisi dan Nota Dinas dari Bupati Tabalong : B-46/INSP/000.1.2.3/I/2026 Tgl: 29 Januari 2026',
       'Surat Tugas dari Bupati Kabupaten Tabalong : B-36/INSP/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
       'Surat Tugas dari Inspektur di Inspektorat Daerah Kabupaten Tabalong : B-38/INSP/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
       'SPD dari Insperktur Inspektorat Daerah Kabupaten Tabalong : 36/INSP/000.1.2.3/I/2026 Tgl : 30 Januari 2026',
@@ -170,6 +177,9 @@ export default function App() {
       unitKerja: 'Inspektorat Kabupaten Tabalong',
       ket: 'H-1 & H+1 Hari H',
       riilDescription: 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+      spdNumber: '36/INSP/000.1.2.3/I/2026',
+      spdDate: '30 Januari 2026',
+      riilPercentage: 30,
       expenses: [
         { id: '1', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 380000, isRiil: false },
         { id: '2', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 110000, isRiil: false },
@@ -201,6 +211,9 @@ export default function App() {
             jabatan: p.jabatan ?? '',
             unitKerja: p.unitKerja ?? 'Inspektorat Daerah Kabupaten Tabalong',
             riilDescription: p.riilDescription ?? 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+            spdNumber: p.spdNumber ?? header.spdNumber,
+            spdDate: p.spdDate ?? header.spdDate,
+            riilPercentage: p.riilPercentage ?? 30,
             expenses: p.expenses.map((e: any) => ({
               ...e,
               isRiil: e.isRiil ?? false
@@ -214,15 +227,66 @@ export default function App() {
     }
   }, []);
 
-  const handleManualSave = () => {
+  const handleManualSave = async () => {
     setSaveStatus('saving');
-    const dataToSave = { header, persons };
+    const dataToSave = { 
+      header, 
+      persons,
+      savedAt: new Date().toISOString()
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     
-    setTimeout(() => {
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    }, 600);
+    // Auto-download as JSON for backup/internal storage (phone/laptop)
+    try {
+      const baseFileName = `SmartLapor_${header.st?.replace(/[\/\\?%*:|"<>]/g, '-') || 'Data'}`;
+      const jsonFileName = `${baseFileName}_${new Date().getTime()}.json`;
+      const jsonBlob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+      const jsonUrl = URL.createObjectURL(jsonBlob);
+      const jsonLink = document.createElement('a');
+      jsonLink.href = jsonUrl;
+      jsonLink.download = jsonFileName;
+      document.body.appendChild(jsonLink);
+      jsonLink.click();
+      document.body.removeChild(jsonLink);
+      URL.revokeObjectURL(jsonUrl);
+    } catch (err) {
+      console.error('Failed to auto-download JSON:', err);
+    }
+
+    // Auto-download as PDF for the current active report
+    try {
+      const element = document.getElementById('report-content-to-export');
+      if (element) {
+        // Clone element to manipulate without affecting UI
+        const opt = {
+          margin:       10, 
+          filename:     `Laporan_Perdin_${header.st?.replace(/[\/\\?%*:|"<>]/g, '-') || 'Dokumen'}_${viewMode}.pdf`,
+          image:        { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            logging: true,
+            letterRendering: true,
+            windowWidth: 1200,
+            onclone: (clonedDoc: Document) => {
+              const exportNode = clonedDoc.getElementById('report-content-to-export');
+              if (exportNode) {
+                exportNode.style.background = 'white';
+                exportNode.style.color = 'black';
+              }
+            }
+          },
+          jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+        };
+        
+        await html2pdf().set(opt).from(element).save();
+      }
+    } catch (err) {
+      console.error('Failed to auto-generate PDF:', err);
+    }
+
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
   };
 
   const handleReset = () => {
@@ -249,6 +313,9 @@ export default function App() {
       unitKerja: 'Inspektorat Daerah Kabupaten Tabalong',
       ket: '',
       riilDescription: 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+      spdNumber: header.spdNumber || '',
+      spdDate: header.spdDate || '',
+      riilPercentage: 30,
       expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false }]
     };
     setPersons([...persons, newPerson]);
@@ -334,76 +401,6 @@ export default function App() {
       window.print();
     }, 500);
   };
-
-  const handleExportExcel = () => {
-    const wb = XLSX.utils.book_new();
-    
-    // Build array of arrays for the sheet
-    const data: any[][] = [
-      ['BELANJA BIAYA PERJALANAN DINAS'],
-      [''],
-      ['ST', ':', `${header.st} Tanggal ${header.stDate}`],
-      ['TUJUAN', ':', `${header.tujuan} pada Tanggal ${header.tujuanStartDate} s.d ${header.tujuanEndDate}`],
-      [''],
-      ['NO', 'NAMA / NIP', 'RINCIAN BIAYA', 'QTY', 'UNIT', '', 'HARGA SATUAN', '', 'JUMLAH', 'TOTAL'],
-    ];
-
-    persons.forEach((person, index) => {
-      // Name and NIP row
-      const pTotal = person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0);
-      data.push([
-        index + 1,
-        person.name,
-        person.expenses[0]?.description || '',
-        person.expenses[0]?.quantity || '',
-        person.expenses[0]?.unit || '',
-        'x',
-        person.expenses[0]?.rate || 0,
-        '=',
-        (person.expenses[0]?.quantity || 0) * (person.expenses[0]?.rate || 0),
-        pTotal
-      ]);
-
-      if (person.nip) {
-        data.push(['', `NIP. ${person.nip}`]);
-      }
-
-      // Remaining expenses
-      person.expenses.slice(1).forEach(exp => {
-        data.push([
-          '',
-          '',
-          exp.description,
-          exp.quantity,
-          exp.unit,
-          'x',
-          exp.rate,
-          '=',
-          exp.quantity * exp.rate,
-          ''
-        ]);
-      });
-
-      data.push(['']);
-    });
-
-    data.push(['Telah Dibayar Sejumlah Rp', '', '', '', '', '', '', '', grandTotal]);
-    data.push(['']);
-    data.push(['', '', '', '', '', '', `${header.place}, ${header.printDate}`]);
-    data.push(['Bendahara', '', '', '', '', '', 'Pembuat Daftar']);
-    data.push(['']);
-    data.push(['']);
-    data.push(['']);
-    data.push([header.bendaharaName, '', '', '', '', '', header.listMakerName]);
-    data.push([`NIP. ${header.bendaharaNip}`, '', '', '', '', '', header.listMakerNip ? `NIP. ${header.listMakerNip}` : '']);
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, "Kwitansi Perdin");
-    
-    // Save file
-    XLSX.writeFile(wb, `Kwitansi_Perdin_${new Date().getTime()}.xlsx`);
-  };
-
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans relative overflow-hidden flex flex-col md:flex-row">
       {/* Background Mesh Gradients */}
@@ -412,182 +409,180 @@ export default function App() {
       <div className="absolute -bottom-[10%] left-[20%] w-[600px] h-[300px] bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none"></div>
 
       {/* Sidebar - Control Panel */}
-      <div className="relative z-10 w-full md:w-96 bg-white/5 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-6 sticky top-0 no-print flex flex-col">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center font-bold text-white shadow-lg">
-            <FileText size={20} />
+      <div className={`relative z-10 w-full ${sidebarWidth === 'wide' ? 'md:w-[900px]' : 'md:w-[520px]'} bg-[#0f172a]/95 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-6 md:p-8 sticky top-0 no-print flex flex-col shadow-2xl transition-all duration-500`}>
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-2xl flex items-center justify-center font-bold text-white shadow-lg">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white">SmartLapor Pro</h1>
+              <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Management System</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Vortex Perdin</h1>
+          <button 
+            onClick={() => setSidebarWidth(sidebarWidth === 'wide' ? 'standard' : 'wide')}
+            className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+          >
+            {sidebarWidth === 'wide' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {sidebarWidth === 'wide' ? 'Samping' : 'Layar Penuh'}
+          </button>
         </div>
 
-        <nav className="flex gap-2 mb-6 p-1 bg-white/5 rounded-xl border border-white/5">
-          <button 
-            onClick={() => setActiveTab('edit')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'edit' ? 'bg-white/10 text-white shadow-sm border border-white/10' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Edit
-          </button>
-          <button 
-            onClick={() => setActiveTab('preview')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'preview' ? 'bg-white/10 text-white shadow-sm border border-white/10' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            Preview
-          </button>
-        </nav>
-
-        <div className="space-y-6 flex-grow overflow-y-auto no-scrollbar pr-1">
-          <section>
-            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Header Dokumen</h2>
-            <div className="space-y-4">
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor ST</label>
-                <input 
-                  type="text" 
-                  value={header.st ?? ''}
-                  onChange={(e) => setHeader({...header, st: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-white placeholder-slate-600 transition-all group-hover:bg-white/10" 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className={`space-y-6 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-500/30 scrollbar-track-white/5 pr-4 -mr-2 ${sidebarWidth === 'wide' ? 'max-w-4xl mx-auto w-full' : ''}`}>
+          <div className="space-y-6 pb-8">
+            <section>
+              <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Header Dokumen</h2>
+              <div className="space-y-4 bg-white/[0.01] p-5 rounded-2xl border border-white/5">
                 <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal ST</label>
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor ST</label>
                   <input 
                     type="text" 
-                    value={header.stDate ?? ''}
-                    onChange={(e) => setHeader({...header, stDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
+                    value={header.st ?? ''}
+                    onChange={(e) => setHeader({...header, st: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl focus:ring-indigo-500 focus:border-indigo-500 text-white placeholder-slate-600 transition-all group-hover:bg-white/10 p-4" 
                   />
                 </div>
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kota/Tempat</label>
-                  <input 
-                    type="text" 
-                    value={header.place ?? ''}
-                    onChange={(e) => setHeader({...header, place: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor SPD</label>
-                  <input 
-                    type="text" 
-                    value={header.spdNumber ?? ''}
-                    onChange={(e) => setHeader({...header, spdNumber: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
-                  />
-                </div>
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal SPD</label>
-                  <input 
-                    type="text" 
-                    value={header.spdDate ?? ''}
-                    onChange={(e) => setHeader({...header, spdDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
-                  />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tujuan Kegiatan</label>
-                <textarea 
-                  value={header.tujuan ?? ''}
-                  onChange={(e) => setHeader({...header, tujuan: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl h-24 text-white group-hover:bg-white/10 p-2"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Mulai Kegiatan</label>
-                  <input 
-                    type="text" 
-                    value={header.tujuanStartDate ?? ''}
-                    onChange={(e) => setHeader({...header, tujuanStartDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
-                  />
-                </div>
-                <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tgl Selesai Kegiatan</label>
-                  <input 
-                    type="text" 
-                    value={header.tujuanEndDate ?? ''}
-                    onChange={(e) => setHeader({...header, tujuanEndDate: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2" 
-                  />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal Cetak (Rincian Biaya)</label>
-                <input 
-                  type="text" 
-                  value={header.printDate ?? ''}
-                  onChange={(e) => setHeader({...header, printDate: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 p-2 font-bold text-indigo-300" 
-                />
-              </div>
-
-              <div className="group relative">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pembuat Daftar</label>
-                <input 
-                  type="text" 
-                  placeholder="Cari Pembuat Daftar..."
-                  value={header.listMakerName ?? ''}
-                  onChange={(e) => {
-                    setHeader({...header, listMakerName: e.target.value});
-                    setSearchTerm(e.target.value);
-                    setActivePersonIdForSearch('listMaker');
-                  }}
-                  onFocus={() => {
-                    setSearchTerm(header.listMakerName ?? '');
-                    setActivePersonIdForSearch('listMaker');
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setActivePersonIdForSearch(null), 200);
-                  }}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 pr-8 font-bold" 
-                />
-                <div className="absolute right-2 top-8 text-white/20">
-                  <Search size={14} />
-                </div>
-                {activePersonIdForSearch === 'listMaker' && filteredStaff.length > 0 && (
-                  <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl font-sans">
-                    <div className="p-2 border-b border-white/5 bg-white/5">
-                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pembuat Daftar</span>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto no-scrollbar">
-                      {filteredStaff.map((staff, sIdx) => (
-                        <button
-                          key={`${staff.nip}-${sIdx}`}
-                          type="button"
-                          className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            selectStaffForListMaker(staff);
-                          }}
-                        >
-                          <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
-                          <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
-                        </button>
-                      ))}
-                    </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tanggal ST</label>
+                    <input 
+                      type="text" 
+                      value={header.stDate ?? ''}
+                      onChange={(e) => setHeader({...header, stDate: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
                   </div>
-                )}
-              </div>
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Kota/Tempat</label>
+                    <input 
+                      type="text" 
+                      value={header.place ?? ''}
+                      onChange={(e) => setHeader({...header, place: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Nomor SPD</label>
+                    <input 
+                      type="text" 
+                      value={header.spdNumber ?? ''}
+                      onChange={(e) => setHeader({...header, spdNumber: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
+                  </div>
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tanggal SPD</label>
+                    <input 
+                      type="text" 
+                      value={header.spdDate ?? ''}
+                      onChange={(e) => setHeader({...header, spdDate: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
+                  </div>
+                </div>
 
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Pembuat Daftar</label>
-                <input 
-                  type="text" 
-                  value={header.listMakerNip ?? ''}
-                  onChange={(e) => setHeader({...header, listMakerNip: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 font-mono" 
-                />
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tujuan Kegiatan</label>
+                  <textarea 
+                    value={header.tujuan ?? ''}
+                    onChange={(e) => setHeader({...header, tujuan: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl h-56 text-white group-hover:bg-white/10 p-4 resize-y"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tgl Mulai Kegiatan</label>
+                    <input 
+                      type="text" 
+                      value={header.tujuanStartDate ?? ''}
+                      onChange={(e) => setHeader({...header, tujuanStartDate: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
+                  </div>
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tgl Selesai Kegiatan</label>
+                    <input 
+                      type="text" 
+                      value={header.tujuanEndDate ?? ''}
+                      onChange={(e) => setHeader({...header, tujuanEndDate: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4" 
+                    />
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">Tanggal Cetak (Rincian Biaya)</label>
+                  <input 
+                    type="text" 
+                    value={header.printDate ?? ''}
+                    onChange={(e) => setHeader({...header, printDate: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 p-4 font-bold text-indigo-300" 
+                  />
+                </div>
+
+                <div className="group relative">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pembuat Daftar</label>
+                  <input 
+                    type="text" 
+                    placeholder="Cari Pembuat Daftar..."
+                    value={header.listMakerName ?? ''}
+                    onChange={(e) => {
+                      setHeader({...header, listMakerName: e.target.value});
+                      setSearchTerm(e.target.value);
+                      setActivePersonIdForSearch('listMaker');
+                    }}
+                    onFocus={() => {
+                      setSearchTerm(header.listMakerName ?? '');
+                      setActivePersonIdForSearch('listMaker');
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setActivePersonIdForSearch(null), 200);
+                    }}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 pr-8 font-bold" 
+                  />
+                  <div className="absolute right-2 top-8 text-white/20">
+                    <Search size={14} />
+                  </div>
+                  {activePersonIdForSearch === 'listMaker' && filteredStaff.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl font-sans">
+                      <div className="p-2 border-b border-white/5 bg-white/5">
+                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pembuat Daftar</span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto no-scrollbar">
+                        {filteredStaff.map((staff, sIdx) => (
+                          <button
+                            key={`${staff.nip}-${sIdx}`}
+                            type="button"
+                            className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectStaffForListMaker(staff);
+                            }}
+                          >
+                            <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
+                            <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Pembuat Daftar</label>
+                  <input 
+                    type="text" 
+                    value={header.listMakerNip ?? ''}
+                    onChange={(e) => setHeader({...header, listMakerNip: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 font-mono" 
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
           <section>
             <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Data Kwitansi Formal</h2>
@@ -595,50 +590,54 @@ export default function App() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="group">
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tahun Anggaran</label>
-                  <input type="text" value={header.tahunAnggaran} onChange={(e) => setHeader({...header, tahunAnggaran: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                  <input type="text" value={header.tahunAnggaran} onChange={(e) => setHeader({...header, tahunAnggaran: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3 font-bold" />
                 </div>
                 <div className="group">
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kode Rekening</label>
-                  <input type="text" value={header.kodeRekening} onChange={(e) => setHeader({...header, kodeRekening: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                  <input type="text" value={header.kodeRekening} onChange={(e) => setHeader({...header, kodeRekening: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" />
                 </div>
               </div>
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Kegiatan</label>
-                <textarea value={header.kegiatan} onChange={(e) => setHeader({...header, kegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-16" />
+                <textarea value={header.kegiatan} onChange={(e) => setHeader({...header, kegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-4 h-32 resize-y" />
               </div>
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Sub Kegiatan</label>
-                <textarea value={header.subKegiatan} onChange={(e) => setHeader({...header, subKegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-16" />
+                <textarea value={header.subKegiatan} onChange={(e) => setHeader({...header, subKegiatan: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-4 h-32 resize-y" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="group">
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">BK Umum</label>
-                  <input type="text" value={header.bkUmum} onChange={(e) => setHeader({...header, bkUmum: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                  <input type="text" value={header.bkUmum} onChange={(e) => setHeader({...header, bkUmum: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" />
                 </div>
                 <div className="group">
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Tanggal BK</label>
-                  <input type="text" value={header.bkTanggal} onChange={(e) => setHeader({...header, bkTanggal: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+                  <input type="text" value={header.bkTanggal} onChange={(e) => setHeader({...header, bkTanggal: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" />
                 </div>
               </div>
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Sudah Terima Dari</label>
-                <textarea value={header.penerimaDuit} onChange={(e) => setHeader({...header, penerimaDuit: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 h-12" />
+                <textarea value={header.penerimaDuit} onChange={(e) => setHeader({...header, penerimaDuit: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-4 h-16" />
               </div>
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (Nama)</label>
-                <input type="text" value={header.pptkName} onChange={(e) => setHeader({...header, pptkName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (Nama)</label>
+                  <input type="text" value={header.pptkName} onChange={(e) => setHeader({...header, pptkName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (NIP)</label>
+                  <input type="text" value={header.pptkNip} onChange={(e) => setHeader({...header, pptkNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3 font-mono" />
+                </div>
               </div>
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PPTK (NIP)</label>
-                <input type="text" value={header.pptkNip} onChange={(e) => setHeader({...header, pptkNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" />
-              </div>
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (Nama)</label>
-                <input type="text" value={header.paName} onChange={(e) => setHeader({...header, paName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" />
-              </div>
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (NIP)</label>
-                <input type="text" value={header.paNip} onChange={(e) => setHeader({...header, paNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (Nama)</label>
+                  <input type="text" value={header.paName} onChange={(e) => setHeader({...header, paName: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" />
+                </div>
+                <div className="group">
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">PA (NIP)</label>
+                  <input type="text" value={header.paNip} onChange={(e) => setHeader({...header, paNip: e.target.value})} className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3 font-mono" />
+                </div>
               </div>
             </div>
           </section>
@@ -648,29 +647,32 @@ export default function App() {
             <div className="space-y-4">
               <div className="group relative">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Bendahara</label>
-                <input 
-                  type="text" 
-                  value={header.bendaharaName ?? ''}
-                  onChange={(e) => {
-                    setHeader({...header, bendaharaName: e.target.value});
-                    setSearchTerm(e.target.value);
-                    setActivePersonIdForSearch('bendahara');
-                  }}
-                  onFocus={() => {
-                    setSearchTerm(header.bendaharaName ?? '');
-                    setActivePersonIdForSearch('bendahara');
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setActivePersonIdForSearch(null), 200);
-                  }}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 pr-8" 
-                />
-                <div className="absolute right-2 top-8 text-white/20">
-                  <Search size={14} />
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={header.bendaharaName ?? ''}
+                    onChange={(e) => {
+                      setHeader({...header, bendaharaName: e.target.value});
+                      setSearchTerm(e.target.value);
+                      setActivePersonIdForSearch('bendahara');
+                    }}
+                    onFocus={() => {
+                      setSearchTerm(header.bendaharaName ?? '');
+                      setActivePersonIdForSearch('bendahara');
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setActivePersonIdForSearch(null), 200);
+                    }}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-4 pr-12" 
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600">
+                    <Search size={16} />
+                  </div>
                 </div>
+
                 {activePersonIdForSearch === 'bendahara' && filteredStaff.length > 0 && (
                   <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl">
-                    <div className="p-2 border-b border-white/5 bg-white/5">
+                    <div className="p-3 border-b border-white/5 bg-white/5">
                       <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Staff</span>
                     </div>
                     <div className="max-h-60 overflow-y-auto no-scrollbar">
@@ -678,7 +680,7 @@ export default function App() {
                         <button
                           key={`${staff.nip}-${sIdx}`}
                           type="button"
-                          className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                          className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             selectStaffForBendahara(staff);
@@ -693,25 +695,25 @@ export default function App() {
                 )}
               </div>
               <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Bendahara</label>
+                <label className="text-[10px] font-semibold text-slate-500 mb-2 block uppercase">NIP Bendahara</label>
                 <input 
                   type="text" 
                   value={header.bendaharaNip ?? ''}
                   onChange={(e) => setHeader({...header, bendaharaNip: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-2 font-mono" 
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white group-hover:bg-white/10 focus:ring-indigo-500 focus:border-indigo-500 transition-all p-4 font-mono" 
                 />
               </div>
             </div>
           </section>
 
           <section>
-            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Data Laporan</h2>
-            <div className="space-y-4">
+            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Data Laporan</h2>
+            <div className="space-y-6">
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Dasar (Poin-poin)</label>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(header.dasarPoints || []).map((point, idx) => (
-                    <div key={idx} className="flex gap-2">
+                    <div key={idx} className="flex gap-3">
                       <textarea
                         value={point}
                         onChange={(e) => {
@@ -719,22 +721,22 @@ export default function App() {
                           newDasar[idx] = e.target.value;
                           setHeader({ ...header, dasarPoints: newDasar });
                         }}
-                        className="flex-1 text-[10px] bg-white/5 border-white/10 rounded-lg p-2 text-white h-12 resize-none"
+                        className="flex-1 text-sm bg-white/5 border-white/10 rounded-2xl p-3 text-white h-24 resize-y"
                       />
                       <button 
                         onClick={() => {
                           const newDasar = (header.dasarPoints || []).filter((_, i) => i !== idx);
                           setHeader({ ...header, dasarPoints: newDasar });
                         }}
-                        className="text-red-400 p-1"
+                        className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition-all h-fit self-center"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                   <button 
                     onClick={() => setHeader({ ...header, dasarPoints: [...(header.dasarPoints || []), ''] })}
-                    className="w-full text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-1 rounded-lg uppercase font-bold"
+                    className="w-full text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-2.5 rounded-xl uppercase font-bold hover:bg-emerald-500/20 transition-all"
                   >
                     + Tambah Dasar
                   </button>
@@ -746,15 +748,15 @@ export default function App() {
                 <textarea 
                   value={header.hasilDescriptive ?? ''}
                   onChange={(e) => setHeader({...header, hasilDescriptive: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl h-20 text-white p-2"
+                  className="w-full text-sm bg-white/5 border-white/10 rounded-2xl h-48 text-white p-3 resize-y"
                 />
               </div>
 
               <div className="group">
                 <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Hasil (Poin-poin)</label>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(header.hasilPoints || []).map((point, idx) => (
-                    <div key={idx} className="flex gap-2">
+                    <div key={idx} className="flex gap-3">
                       <textarea
                         value={point}
                         onChange={(e) => {
@@ -762,78 +764,81 @@ export default function App() {
                           newHasil[idx] = e.target.value;
                           setHeader({ ...header, hasilPoints: newHasil });
                         }}
-                        className="flex-1 text-[10px] bg-white/5 border-white/10 rounded-lg p-2 text-white h-12 resize-none"
+                        className="flex-1 text-sm bg-white/5 border-white/10 rounded-2xl p-3 text-white h-24 resize-y"
                       />
                       <button 
                         onClick={() => {
                           const newHasil = (header.hasilPoints || []).filter((_, i) => i !== idx);
                           setHeader({ ...header, hasilPoints: newHasil });
                         }}
-                        className="text-red-400 p-1"
+                        className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition-all h-fit self-center"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                   <button 
                     onClick={() => setHeader({ ...header, hasilPoints: [...(header.hasilPoints || []), ''] })}
-                    className="w-full text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-1 rounded-lg uppercase font-bold"
+                    className="w-full text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-2.5 rounded-xl uppercase font-bold hover:bg-emerald-500/20 transition-all"
                   >
                     + Tambah Poin Hasil
                   </button>
                 </div>
               </div>
 
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (Nama)</label>
-                <input 
-                  type="text" 
-                  value={header.inspectorName ?? ''}
-                  onChange={(e) => setHeader({...header, inspectorName: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
-                />
-              </div>
-              <div className="group">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (NIP)</label>
-                <input 
-                  type="text" 
-                  value={header.inspectorNip ?? ''}
-                  onChange={(e) => setHeader({...header, inspectorNip: e.target.value})}
-                  className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2 font-mono" 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
                 <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Jabatan</label>
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (Nama)</label>
                   <input 
                     type="text" 
-                    value={header.inspectorJabatan ?? ''}
-                    onChange={(e) => setHeader({...header, inspectorJabatan: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
+                    value={header.inspectorName ?? ''}
+                    onChange={(e) => setHeader({...header, inspectorName: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" 
                   />
                 </div>
                 <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pangkat/Gol</label>
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Inspektur (NIP)</label>
                   <input 
                     type="text" 
-                    value={header.inspectorUnit ?? ''}
-                    onChange={(e) => setHeader({...header, inspectorUnit: e.target.value})}
-                    className="w-full text-sm bg-white/5 border-white/10 rounded-xl text-white p-2" 
+                    value={header.inspectorNip ?? ''}
+                    onChange={(e) => setHeader({...header, inspectorNip: e.target.value})}
+                    className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3 font-mono" 
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Jabatan</label>
+                    <input 
+                      type="text" 
+                      value={header.inspectorJabatan ?? ''}
+                      onChange={(e) => setHeader({...header, inspectorJabatan: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" 
+                    />
+                  </div>
+                  <div className="group">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pangkat/Gol</label>
+                    <input 
+                      type="text" 
+                      value={header.inspectorUnit ?? ''}
+                      onChange={(e) => setHeader({...header, inspectorUnit: e.target.value})}
+                      className="w-full text-sm bg-white/5 border-white/10 rounded-2xl text-white p-3" 
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
           <section>
-            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Dokumentasi</h2>
+            <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Dokumentasi</h2>
             <div className="space-y-4">
               <div 
-                className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500/50 transition-colors cursor-pointer group"
+                className="border-2 border-dashed border-white/10 rounded-2xl p-8 text-center hover:border-indigo-500/50 transition-colors cursor-pointer group bg-white/5"
                 onClick={() => document.getElementById('photo-upload')?.click()}
               >
                 <Camera className="mx-auto text-slate-500 group-hover:text-indigo-400 mb-2" size={24} />
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Klik untuk Unggah Foto</p>
+                <p className="text-xs font-bold text-slate-400 group-hover:text-white">Klik untuk Unggah Foto</p>
+                <p className="text-[9px] text-slate-600 mt-1">Maksimal 10 foto terbaik</p>
                 <input 
                   id="photo-upload"
                   type="file" 
@@ -841,7 +846,7 @@ export default function App() {
                   accept="image/*"
                   className="hidden"
                   onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
+                    const files = Array.from(e.target.files || []) as File[];
                     files.forEach(file => {
                       const reader = new FileReader();
                       reader.onloadend = () => {
@@ -854,16 +859,18 @@ export default function App() {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-4 pt-4">
                 {(header.photos || []).map((photo, idx) => (
-                  <div key={idx} className="relative group rounded-lg overflow-hidden aspect-video bg-white/5">
+                  <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-video bg-white/5 border border-white/10">
                     <img src={photo} className="w-full h-full object-cover" />
-                    <button 
-                      onClick={() => setHeader(h => ({ ...h, photos: (h.photos || []).filter((_, i) => i !== idx) }))}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button 
+                        onClick={() => setHeader(h => ({ ...h, photos: (h.photos || []).filter((_, i) => i !== idx) }))}
+                        className="bg-red-500 text-white p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -875,56 +882,59 @@ export default function App() {
               <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">Personel</h2>
               <button 
                 onClick={addPerson}
-                className="text-[10px] flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg font-bold uppercase transition-all"
+                className="text-[9px] flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 px-3 py-1.5 rounded-xl font-bold uppercase transition-all"
               >
-                <Plus size={12} /> Tambah
+                <Plus size={12} /> Personel
               </button>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-4">
               {persons.map((p, pIdx) => (
-                <div key={p.id} className="p-5 bg-white/5 border border-white/10 rounded-3xl relative group/card transition-all hover:bg-white/[0.07] hover:border-white/20">
+                <div key={p.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative group/card transition-all hover:bg-white/[0.07] hover:border-white/20">
                   <button 
                     onClick={() => removePerson(p.id)}
-                    className="absolute -top-2 -right-2 p-2 bg-red-500/80 hover:bg-red-500 text-white rounded-xl opacity-0 group-hover/card:opacity-100 transition-all shadow-xl backdrop-blur-md"
+                    className="absolute top-2 right-2 p-2 bg-red-500/80 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover/card:opacity-100 transition-all shadow-lg backdrop-blur-md"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={14} />
                   </button>
                   
                   <div className="space-y-4">
-                    <div className="relative">
-                      <div className="absolute right-0 top-0 p-1 text-slate-600 group-focus-within:text-indigo-400">
-                        <Search size={14} />
+                    <div className="relative group/field">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 mb-2 block">Cari di Database Staff</label>
+                      <div className="relative">
+                        <input 
+                          placeholder="Ketik Nama Pegawai..." 
+                          value={p.name ?? ''}
+                          onChange={(e) => {
+                            updatePerson(p.id, 'name', e.target.value);
+                            setSearchTerm(e.target.value);
+                            setActivePersonIdForSearch(p.id);
+                          }}
+                          onFocus={() => {
+                            setSearchTerm(p.name ?? '');
+                            setActivePersonIdForSearch(p.id);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setActivePersonIdForSearch(null), 200);
+                          }}
+                          className="w-full text-sm font-bold bg-white/5 border border-white/10 rounded-2xl p-4 text-white placeholder-slate-700 focus:bg-white/10 focus:border-indigo-500 transition-all pr-12" 
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600">
+                          <Search size={16} />
+                        </div>
                       </div>
-                      <input 
-                        placeholder="Nama Lengkap (Cari di Database...)" 
-                        value={p.name ?? ''}
-                        onChange={(e) => {
-                          updatePerson(p.id, 'name', e.target.value);
-                          setSearchTerm(e.target.value);
-                          setActivePersonIdForSearch(p.id);
-                        }}
-                        onFocus={() => {
-                          setSearchTerm(p.name ?? '');
-                          setActivePersonIdForSearch(p.id);
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => setActivePersonIdForSearch(null), 200);
-                        }}
-                        className="w-full text-sm font-bold bg-transparent border-b border-white/10 focus:border-indigo-500 focus:ring-0 p-0 pb-1 text-white placeholder-slate-600"
-                      />
                       
                       {activePersonIdForSearch === p.id && filteredStaff.length > 0 && (
                         <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl">
-                          <div className="p-2 border-b border-white/5 bg-white/5">
-                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian</span>
+                          <div className="p-3 border-b border-white/5 bg-white/5">
+                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Staff</span>
                           </div>
                           <div className="max-h-60 overflow-y-auto no-scrollbar">
                             {filteredStaff.map((staff, sIdx) => (
                               <button
                                 key={`${staff.nip}-${sIdx}`}
                                 type="button"
-                                className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                                className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   selectStaffForPerson(p.id, staff);
@@ -938,53 +948,138 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <input 
-                      placeholder="NIP" 
-                      value={p.nip ?? ''}
-                      onChange={(e) => updatePerson(p.id, 'nip', e.target.value)}
-                      className="w-full text-[11px] text-slate-400 bg-transparent border-b border-white/10 focus:border-indigo-500 focus:ring-0 p-0 pb-1 font-mono"
-                    />
-
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">NIP</label>
+                        <input 
+                          placeholder="NIP" 
+                          value={p.nip ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'nip', e.target.value)}
+                          className="w-full text-sm text-slate-300 bg-white/5 border border-white/10 rounded-xl p-4 font-mono focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Jabatan</label>
                         <input 
                           placeholder="Jabatan" 
                           value={p.jabatan ?? ''}
                           onChange={(e) => updatePerson(p.id, 'jabatan', e.target.value)}
-                          className="text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300"
+                          className="w-full text-sm bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-500 outline-none"
                         />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Unit Kerja</label>
+                      <input 
+                        placeholder="Unit Kerja" 
+                        value={p.unitKerja ?? ''}
+                        onChange={(e) => updatePerson(p.id, 'unitKerja', e.target.value)}
+                        className="w-full text-sm bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Nomor SPD</label>
                         <input 
-                          placeholder="Unit Kerja" 
-                          value={p.unitKerja ?? ''}
-                          onChange={(e) => updatePerson(p.id, 'unitKerja', e.target.value)}
-                          className="text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300"
+                          placeholder="Nomor SPD" 
+                          value={p.spdNumber ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'spdNumber', e.target.value)}
+                          className="w-full text-sm bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-500 outline-none"
                         />
                       </div>
-
-                    <div className="mt-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Uraian Riil (Kalimat Penjelas)</label>
-                        <textarea 
-                          placeholder="Kalimat penjelas Pengeluaran Riil..." 
-                          value={p.riilDescription ?? ''}
-                          onChange={(e) => updatePerson(p.id, 'riilDescription', e.target.value)}
-                          className="w-full text-[10px] bg-white/5 border-white/5 rounded-lg p-2 text-slate-300 h-16 resize-none"
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Tanggal SPD</label>
+                        <input 
+                          placeholder="Tanggal SPD" 
+                          value={p.spdDate ?? ''}
+                          onChange={(e) => updatePerson(p.id, 'spdDate', e.target.value)}
+                          className="w-full text-sm bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-500 outline-none"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Persentase Riil (%)</label>
+                        <input 
+                          type="number"
+                          placeholder="30" 
+                          value={p.riilPercentage ?? 30}
+                          onChange={(e) => updatePerson(p.id, 'riilPercentage', parseInt(e.target.value) || 0)}
+                          className="w-full text-sm bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
 
-                      <div className="mt-2 flex gap-2">
-                        <button 
-                          onClick={() => {
-                            const newExpenses = [
-                              { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 1, unit: 'Hari', rate: 380000, isRiil: false },
-                              { id: crypto.randomUUID(), description: 'Representasi', quantity: 1, unit: 'Hari', rate: 110000, isRiil: false },
-                              { id: crypto.randomUUID(), description: 'Penginapan', quantity: 1, unit: 'Malam', rate: 250000, isRiil: true },
-                              { id: crypto.randomUUID(), description: 'Transportasi', quantity: 1, unit: 'Layanan', rate: 180000, isRiil: false }
-                            ];
-                            updatePerson(p.id, 'expenses', newExpenses);
-                          }}
-                          className="flex-1 text-[9px] bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20 py-1.5 rounded-lg font-bold uppercase transition-all"
-                        >
-                          Template Biaya Standar
-                        </button>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Uraian Riil (Kalimat Penjelas)</label>
+                      <textarea 
+                        placeholder="Kalimat penjelas Pengeluaran Riil..." 
+                        value={p.riilDescription ?? ''}
+                        onChange={(e) => updatePerson(p.id, 'riilDescription', e.target.value)}
+                        className="w-full text-sm bg-white/5 border border-white/10 rounded-2xl p-4 text-slate-300 h-40 resize-y focus:border-indigo-500 outline-none"
+                      />
+                    </div>
+
+                      <div className="mt-2 space-y-2">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              const newExpenses = [
+                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 4, unit: 'Hari', rate: 430000, isRiil: false },
+                                { id: crypto.randomUUID(), description: 'Uang Penginapan', quantity: 3, unit: 'Malam', rate: 650000, isRiil: true },
+                                { id: crypto.randomUUID(), description: 'Transport Bandara (PP)', quantity: 1, unit: 'Layanan', rate: 300000, isRiil: false }
+                              ];
+                              updatePerson(p.id, 'expenses', newExpenses);
+                            }}
+                            className="flex-1 text-[9px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 py-2 rounded-xl font-bold uppercase transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <FileText size={12} /> Template Hotel
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const newExpenses = [
+                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 1, unit: 'Hari', rate: 150000, isRiil: false },
+                                { id: crypto.randomUUID(), description: 'Transport Lokal', quantity: 1, unit: 'Layanan', rate: 100000, isRiil: true }
+                              ];
+                              updatePerson(p.id, 'expenses', newExpenses);
+                            }}
+                            className="flex-1 text-[9px] bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 hover:bg-fuchsia-500/20 py-2 rounded-xl font-bold uppercase transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <FileText size={12} /> Template Lokal
+                          </button>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest w-full mb-1">Quick Add (Riil):</span>
+                          <button 
+                            onClick={() => {
+                              const item = { id: crypto.randomUUID(), description: 'Sewa Hotel', quantity: 1, unit: 'Malam', rate: 0, isRiil: true };
+                              updatePerson(p.id, 'expenses', [...p.expenses, item]);
+                            }}
+                            className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
+                          >
+                            + Hotel
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const item = { id: crypto.randomUUID(), description: 'Transportasi Riil', quantity: 1, unit: 'Layanan', rate: 0, isRiil: true };
+                              updatePerson(p.id, 'expenses', [...p.expenses, item]);
+                            }}
+                            className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
+                          >
+                            + Transport
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const item = { id: crypto.randomUUID(), description: 'Lain-lain (Riil)', quantity: 1, unit: 'Item', rate: 0, isRiil: true };
+                              updatePerson(p.id, 'expenses', [...p.expenses, item]);
+                            }}
+                            className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
+                          >
+                            + Lainnya
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="mt-4 space-y-3">
@@ -997,44 +1092,58 @@ export default function App() {
                       </div>
                       
                       {p.expenses.map((e, eIdx) => (
-                        <div key={e.id} className="flex gap-1.5 items-start">
-                          <input 
-                            placeholder="Desc" 
-                            value={e.description ?? ''}
-                            onChange={(val) => updateExpense(p.id, e.id, 'description', val.target.value)}
-                            className="flex-1 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white placeholder-slate-600"
-                          />
-                          <input 
-                            type="number"
-                            value={e.quantity ?? 0}
-                            onChange={(val) => updateExpense(p.id, e.id, 'quantity', parseInt(val.target.value) || 0)}
-                            className="w-10 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white"
-                          />
-                          <input 
-                            placeholder="Unit"
-                            value={e.unit ?? ''}
-                            onChange={(val) => updateExpense(p.id, e.id, 'unit', val.target.value)}
-                            className="w-12 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-white"
-                          />
-                          <input 
-                            type="number"
-                            value={e.rate ?? 0}
-                            onChange={(val) => updateExpense(p.id, e.id, 'rate', parseInt(val.target.value) || 0)}
-                            className="w-20 text-[10px] bg-white/5 border-white/5 rounded-lg p-1.5 text-right text-white font-mono"
-                          />
-                          <button 
-                            onClick={() => updateExpense(p.id, e.id, 'isRiil', !e.isRiil)}
-                            className={`p-1.5 rounded-lg border transition-all ${e.isRiil ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-white/5 border-white/5 text-slate-600'}`}
-                            title={e.isRiil ? "Item Riil" : "Bukan Item Riil"}
-                          >
-                            <FileText size={10} />
-                          </button>
-                          <button 
-                            onClick={() => removeExpense(p.id, e.id)}
-                            className="text-red-400 hover:text-red-300 p-1.5 transition-colors"
-                          >
-                            <Trash2 size={10} />
-                          </button>
+                        <div key={e.id} className="flex gap-2 items-start bg-white/5 p-2 rounded-xl border border-white/5">
+                          <div className="flex-1 space-y-1">
+                            <label className="text-[8px] uppercase text-slate-500 font-bold ml-1">Keterangan</label>
+                            <input 
+                              placeholder="Contoh: Uang Harian" 
+                              value={e.description ?? ''}
+                              onChange={(val) => updateExpense(p.id, e.id, 'description', val.target.value)}
+                              className="w-full text-xs font-bold bg-white/5 border-white/5 rounded-lg p-2 text-white placeholder-slate-600 focus:bg-white/10 transition-all"
+                            />
+                          </div>
+                          <div className="w-16 space-y-1">
+                            <label className="text-[8px] uppercase text-slate-500 font-bold ml-1">Qty</label>
+                            <input 
+                              type="number"
+                              value={e.quantity ?? 0}
+                              onChange={(val) => updateExpense(p.id, e.id, 'quantity', parseInt(val.target.value) || 0)}
+                              className="w-full text-xs bg-white/5 border-white/5 rounded-lg p-2 text-white font-bold"
+                            />
+                          </div>
+                          <div className="w-16 space-y-1">
+                            <label className="text-[8px] uppercase text-slate-500 font-bold ml-1">Satuan</label>
+                            <input 
+                              placeholder="Hari"
+                              value={e.unit ?? ''}
+                              onChange={(val) => updateExpense(p.id, e.id, 'unit', val.target.value)}
+                              className="w-full text-xs bg-white/5 border-white/5 rounded-lg p-2 text-white"
+                            />
+                          </div>
+                          <div className="w-32 space-y-1">
+                            <label className="text-[8px] uppercase text-slate-500 font-bold ml-1">Harga Satuan</label>
+                            <input 
+                              type="number"
+                              value={e.rate ?? 0}
+                              onChange={(val) => updateExpense(p.id, e.id, 'rate', parseInt(val.target.value) || 0)}
+                              className="w-full text-xs bg-white/5 border-white/5 rounded-lg p-2 text-right text-indigo-300 font-mono font-bold"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 pt-5">
+                            <button 
+                              onClick={() => updateExpense(p.id, e.id, 'isRiil', !e.isRiil)}
+                              className={`p-2 rounded-lg border transition-all ${e.isRiil ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-white/5 border-white/5 text-slate-600 hover:text-slate-400'}`}
+                              title={e.isRiil ? "Item Riil" : "Bukan Item Riil"}
+                            >
+                              <FileText size={14} />
+                            </button>
+                            <button 
+                              onClick={() => removeExpense(p.id, e.id)}
+                              className="text-red-400 hover:text-red-300 p-2 transition-colors bg-red-500/5 rounded-lg"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1048,8 +1157,9 @@ export default function App() {
                     </div>
                   </div>
                 ))}
-            </div>
-          </section>
+              </div>
+            </section>
+          </div>
         </div>
 
         <div className="pt-6 border-t border-white/10 mt-auto space-y-3">
@@ -1128,13 +1238,6 @@ export default function App() {
           </div>
           
           <button 
-            onClick={handleExportExcel}
-            className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-2xl transition-all border border-white/10 uppercase text-xs tracking-widest"
-          >
-            <Download size={14} />
-            Export Excel
-          </button>
-          <button 
             onClick={handlePrint}
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-indigo-500/20 active:scale-[0.98] uppercase text-xs tracking-widest"
           >
@@ -1145,7 +1248,7 @@ export default function App() {
       </div>
 
       {/* Main Preview Area */}
-      <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar md:p-12 flex flex-col items-center print:p-0 print:bg-white pb-20">
+      <div id="report-content-to-export" className={`relative z-10 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 md:p-12 flex flex-col items-center print:p-0 print:bg-white pb-20 ${sidebarWidth === 'wide' ? 'hidden md:flex md:opacity-0 md:pointer-events-none md:absolute md:-z-10' : 'flex'}`}>
         
         {viewMode === 'sampul' && (
           /* SAMPUL LAPORAN PREVIEW */
@@ -1192,7 +1295,7 @@ export default function App() {
 
                 <div className="text-center space-y-1 border-t border-slate-100 pt-8 w-full max-w-lg">
                   <p className="text-base font-black uppercase tracking-widest text-slate-800">
-                    {header.penerimaDuit.replace('Bendahara Pengeluaran ', '')} KABUPATEN TABALONG
+                    {header.penerimaDuit.replace('Bendahara Pengeluaran ', '')}
                   </p>
                 </div>
               </div>
@@ -1204,13 +1307,13 @@ export default function App() {
           <div id="print-area" className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none">
             
             {/* Document Header */}
-            <div className="text-center mb-8 border-b-2 border-black pb-2">
+            <div className="text-center mb-4 border-b-2 border-black pb-1">
               <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
-                Belanja Biaya Perjalanan Dinas
+                Rincian Belanja Biaya Perjalanan Dinas
               </h1>
             </div>
 
-            <div className="space-y-1 mb-6 text-sm">
+            <div className="space-y-0.5 mb-3 text-sm">
               <div className="flex">
                 <span className="w-20 font-bold">ST</span>
                 <span className="mr-1">:</span>
@@ -1225,24 +1328,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* Table for each person */}
-            {persons.map((person, index) => (
-              <div key={person.id} className="mb-6 break-inside-avoid">
-                <table className="w-full border-collapse border-2 border-black text-[11px]">
-                  <thead>
-                    <tr className="bg-neutral-100 uppercase font-bold text-center border-b-2 border-black transition-colors">
-                      <th className="border-r-2 border-black w-8 py-2 text-[10px]">No</th>
-                      <th className="border-r-2 border-black w-48 py-2 text-[10px] font-black">Nama / NIP</th>
-                      <th className="border-r-2 border-black py-2 text-[10px]">Rincian Komponen Biaya Perjalanan Dinas</th>
-                      <th className="border-r-2 border-black w-24 py-2 text-[10px]">Jumlah (Rp)</th>
-                      <th className="w-28 py-2 text-[10px]">Tanda Terima</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="bg-white">
-                      <td className="border-r-2 border-black text-center align-top py-2 font-bold">{index + 1}</td>
-                      <td className="border-r-2 border-black align-top p-2 leading-tight">
-                        <div className="font-bold underline mb-1 uppercase text-xs">{person.name}</div>
+            {/* Combined Table for all persons */}
+            <div className="mb-4 break-inside-avoid">
+              <table className="w-full border-collapse border-2 border-black text-[11px]">
+                <thead>
+                  <tr className="bg-neutral-100 uppercase font-bold text-center border-b-2 border-black transition-colors">
+                    <th className="border-r-2 border-black w-8 py-1 text-[10px]">No</th>
+                    <th className="border-r-2 border-black w-48 py-1 text-[10px] font-black">Nama / NIP</th>
+                    <th className="border-r-2 border-black py-1 text-[10px]">Rincian Komponen Biaya Perjalanan Dinas</th>
+                    <th className="border-r-2 border-black w-24 py-1 text-[10px]">Jumlah (Rp)</th>
+                    <th className="w-28 py-1 text-[10px]">Tanda Terima</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {persons.map((person, index) => (
+                    <tr key={person.id} className="bg-white border-b-2 border-black last:border-b-0">
+                      <td className="border-r-2 border-black text-center align-top py-1 font-bold">{index + 1}</td>
+                      <td className="border-r-2 border-black align-top p-1 leading-tight">
+                        <div className="font-bold underline mb-0.5 uppercase text-xs">{person.name}</div>
                         <div className="uppercase">NIP. {person.nip}</div>
                       </td>
                       <td className="border-r-2 border-black align-top">
@@ -1250,12 +1353,12 @@ export default function App() {
                           <tbody>
                             {person.expenses.map((exp, idx) => (
                               <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-200" : ""}>
-                                <td className="p-1 w-28">{exp.description}</td>
-                                <td className="p-1 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
-                                <td className="p-1 w-4 text-center text-neutral-300">x</td>
-                                <td className="p-1 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
-                                <td className="p-1 w-4 text-center text-neutral-300">=</td>
-                                <td className="p-1 text-right font-medium">
+                                <td className="p-0.5 w-28">{exp.description}</td>
+                                <td className="p-0.5 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
+                                <td className="p-0.5 w-4 text-center text-neutral-300">x</td>
+                                <td className="p-0.5 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
+                                <td className="p-0.5 w-4 text-center text-neutral-300">=</td>
+                                <td className="p-0.5 text-right font-medium">
                                   {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
                                 </td>
                               </tr>
@@ -1263,33 +1366,33 @@ export default function App() {
                           </tbody>
                         </table>
                       </td>
-                      <td className="border-r-2 border-black text-right align-top py-2 px-2 text-[11px] font-black">
+                      <td className="border-r-2 border-black text-right align-top py-1 px-1 text-[11px] font-black">
                         {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
                       </td>
-                      <td className="align-middle text-center p-2 text-neutral-300 relative">
-                      <span className="block border-b border-dotted border-neutral-400 w-full mt-4"></span>
+                      <td className="align-middle text-center p-1 text-neutral-300 relative">
+                        <span className="block border-b border-dotted border-neutral-400 w-full mt-2"></span>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            ))}
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Grand Total Bar */}
-            <div className="bg-neutral-100 border-2 border-black mb-10 break-inside-avoid shadow-sm">
-              <div className="p-4 flex justify-between items-center border-b border-black">
+            <div className="bg-neutral-100 border-2 border-black mb-4 break-inside-avoid shadow-sm">
+              <div className="p-2 flex justify-between items-center border-b border-black">
                 <span className="italic font-black text-lg tracking-wider uppercase">Total Dibayarkan Sejumlah Rp</span>
                 <span className="font-black text-3xl italic">{formatCurrency(grandTotal).replace('Rp ', '')}</span>
               </div>
-              <div className="p-2 px-4 bg-white italic font-bold text-[11px] uppercase tracking-tight">
+              <div className="p-1 px-4 bg-white italic font-bold text-[11px] uppercase tracking-tight">
                 # {terbilang(grandTotal)} Rupiah #
               </div>
             </div>
 
             {/* Signatures */}
-            <div className="grid grid-cols-2 gap-10 mt-10 text-sm break-inside-avoid px-8">
-              <div className="text-center space-y-16">
-                <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+            <div className="grid grid-cols-2 gap-10 mt-6 text-sm break-inside-avoid px-8">
+              <div className="text-center space-y-12">
+                <div className="font-medium min-h-[2.5rem] flex flex-col justify-end pb-1">
                   <span>Bendahara,</span>
                 </div>
                 <div className="flex flex-col items-center">
@@ -1298,8 +1401,8 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="text-center space-y-16">
-                <div className="font-medium min-h-[3rem] flex flex-col justify-end pb-1">
+              <div className="text-center space-y-12">
+                <div className="font-medium min-h-[2.5rem] flex flex-col justify-end pb-1">
                   <span className="text-[11px] mb-1">{header.place}, {header.printDate}</span>
                   <span>Pembuat Daftar,</span>
                 </div>
@@ -1318,16 +1421,16 @@ export default function App() {
 
         {viewMode === 'riil' && (
           /* DAFTAR PENGELUARAN RIIL PREVIEW */
-          <div className="space-y-10 w-full flex flex-col items-center">
+          <div className="space-y-6 w-full flex flex-col items-center">
             {persons.map((person) => (
               <div key={person.id} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page">
-                <div className="text-center mb-8">
+                <div className="text-center mb-4">
                   <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
                     SURAT PERNYATAAN DAFTAR PENGELUARAN RIIL
                   </h1>
                 </div>
 
-                <div className="space-y-1 mb-6 text-[13px]">
+                <div className="space-y-0.5 mb-3 text-[13px]">
                   <table className="w-full">
                     <tbody>
                       <tr>
@@ -1378,22 +1481,22 @@ export default function App() {
                   </table>
                 </div>
 
-                <div className="text-[13px] leading-relaxed mb-6 text-justify">
-                  Berdasarkan Surat Perjalanan Dinas (SPD) tanggal {header.spdDate || '....................'}, Nomor : {header.spdNumber || '....................'}, dengan ini kami menyatakan dengan sepenuhnya :
+                <div className="text-[13px] leading-relaxed mb-3 text-justify">
+                  Berdasarkan Surat Perjalanan Dinas (SPD) tanggal {person.spdDate || '....................'}, Nomor : {person.spdNumber || '....................'}, dengan ini kami menyatakan dengan sepenuhnya :
                 </div>
 
-                <div className="text-[13px] mb-4 flex gap-1">
+                <div className="text-[13px] mb-2 flex gap-1">
                   <span className="whitespace-nowrap">1.</span>
                   <textarea 
-                    className="w-full bg-transparent border-none focus:ring-0 p-0 h-16 resize-none align-top leading-relaxed" 
+                    className="w-full bg-transparent border-none focus:ring-0 p-0 h-12 resize-none align-top leading-relaxed" 
                     value={person.riilDescription ?? ''} 
                     onChange={(e) => updatePerson(person.id, 'riilDescription', e.target.value)}
                   />
                 </div>
 
-                <table className="w-full border-collapse border-2 border-black text-[13px] mb-6">
+                <table className="w-full border-collapse border-2 border-black text-[13px] mb-3">
                   <thead>
-                    <tr className="border-b-2 border-black font-bold text-center h-10">
+                    <tr className="border-b-2 border-black font-bold text-center h-8">
                       <th className="border-r-2 border-black w-12">No.</th>
                       <th className="border-r-2 border-black">U r a i a n</th>
                       <th className="w-48 text-center px-2">Jumlah</th>
@@ -1406,8 +1509,8 @@ export default function App() {
                       </tr>
                     ) : person.expenses.filter(e => e.isRiil).map((exp, riilIdx) => (
                       <tr key={exp.id} className="border-b border-black">
-                        <td className="border-r-2 border-black text-center py-2">{riilIdx + 1}.</td>
-                        <td className="border-r-2 border-black px-3 py-2">
+                        <td className="border-r-2 border-black text-center py-1">{riilIdx + 1}.</td>
+                        <td className="border-r-2 border-black px-2 py-1">
                           <div className="flex gap-1 items-center text-[13px]">
                             <input 
                               className="bg-transparent border-none focus:ring-0 p-0 text-[13px] flex-1"
@@ -1426,7 +1529,16 @@ export default function App() {
                               value={exp.unit ?? ''}
                               onChange={(e) => updateExpense(person.id, exp.id, 'unit', e.target.value)}
                             />
-                            <span className="whitespace-nowrap px-1 font-bold">x 30%</span>
+                            <div className="flex items-center font-bold px-1">
+                              <span>x</span>
+                              <input 
+                                type="number"
+                                className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-8 font-bold text-center"
+                                value={person.riilPercentage}
+                                onChange={(e) => updatePerson(person.id, 'riilPercentage', parseInt(e.target.value) || 0)}
+                              />
+                              <span>%</span>
+                            </div>
                             <div className="hidden">
                               <input 
                                 type="number"
@@ -1436,27 +1548,27 @@ export default function App() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-1">
                           <div className="flex justify-between w-full">
                             <span>Rp.</span>
-                            <span className="font-mono">{formatCurrency((exp.quantity * exp.rate) * 0.3).replace('Rp ', '')}</span>
+                            <span className="font-mono">{formatCurrency((exp.quantity * exp.rate) * (person.riilPercentage / 100)).replace('Rp ', '')}</span>
                           </div>
                         </td>
                       </tr>
                     ))}
-                    <tr className="font-bold bg-neutral-50 h-10">
+                    <tr className="font-bold bg-neutral-50 h-8">
                       <td colSpan={2} className="border-r-2 border-black text-center uppercase tracking-widest">Jumlah</td>
-                      <td className="px-3">
+                      <td className="px-2">
                          <div className="flex justify-between w-full">
                             <span>Rp.</span>
-                            <span className="font-mono">{formatCurrency(person.expenses.filter(e => e.isRiil).reduce((s, e) => s + (e.quantity * e.rate * 0.3), 0)).replace('Rp ', '')}</span>
+                            <span className="font-mono">{formatCurrency(person.expenses.filter(e => e.isRiil).reduce((s, e) => s + (e.quantity * e.rate * (person.riilPercentage / 100)), 0)).replace('Rp ', '')}</span>
                          </div>
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                <div className="text-[13px] space-y-4 leading-relaxed text-justify mb-10">
+                <div className="text-[13px] space-y-2 leading-relaxed text-justify mb-5">
                   <p>
                     2. Jumlah uang tersebut pada angka 1 diatas benar-benar dikeluarkan untuk pelaksanaan perjalanan dinas dimaksud dan apabila dikemudian hari terdapat kelebihan atas pembayaran, kami bersedia untuk menyetorkan kembali kelebihan tersebut ke Kas Daerah.
                   </p>
@@ -1467,7 +1579,7 @@ export default function App() {
 
                 <div className="flex flex-col items-end text-[13px] px-10">
                   <div className="text-center">
-                    <div className="mb-24">
+                    <div className="mb-16">
                       {header.place}, {header.printDate} <br/>
                       Yang melakukan perjalanan dinas,
                     </div>
@@ -1523,7 +1635,7 @@ export default function App() {
                 </div>
 
                 <div className="text-[14px] leading-relaxed mb-8 text-justify">
-                  Berdasarkan Surat Perjalanan Dinas (SPD) Nomor : <span className="font-bold">{header.spdNumber || '......................................'}</span> tanggal <span className="font-bold">{header.spdDate || '......................................'}</span>, dengan ini menyatakan dengan sesungguhnya bahwa biaya-biaya yang saya keluarkan/pertanggungjawabkan berdasarkan bukti-bukti yang terlampir menjadi tanggung jawab mutlak saya sepenuhnya.
+                  Berdasarkan Surat Perjalanan Dinas (SPD) Nomor : <span className="font-bold">{person.spdNumber || '......................................'}</span> tanggal <span className="font-bold">{person.spdDate || '......................................'}</span>, dengan ini menyatakan dengan sesungguhnya bahwa biaya-biaya yang saya keluarkan/pertanggungjawabkan berdasarkan bukti-bukti yang terlampir menjadi tanggung jawab mutlak saya sepenuhnya.
                 </div>
 
                 <div className="text-[14px] leading-relaxed text-justify mb-20">
@@ -1637,18 +1749,18 @@ export default function App() {
         {viewMode === 'foto' && (
           /* FOTO DOKUMENTASI PREVIEW (Single A4 Page) */
           <div className="w-full flex flex-col items-center">
-            <div className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col">
-              <div className="text-center mb-10">
+            <div className="bg-white shadow-2xl p-4 md:pt-10 md:pb-14 md:px-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-12 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col">
+              <div className="text-center mb-6">
                 <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
                   FOTO DOKUMENTASI KEGIATAN
                 </h1>
               </div>
 
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
                 {(header.photos || []).length > 0 ? (
                   (header.photos || []).map((photo, idx) => (
-                    <div key={idx} className="w-full flex items-center justify-center border-2 border-black p-2 bg-gray-50 overflow-hidden h-[300px]">
-                      <img src={photo} className="max-w-full max-h-full object-contain" alt={`Dokumentasi ${idx + 1}`} />
+                    <div key={idx} className="w-full flex items-center justify-center border-2 border-black p-1 bg-gray-50 overflow-hidden h-[420px]">
+                      <img src={photo} className="w-full h-full object-contain" alt={`Dokumentasi ${idx + 1}`} />
                     </div>
                   ))
                 ) : (
@@ -1719,7 +1831,7 @@ export default function App() {
                       <div className="flex-1 font-medium leading-tight">{header.penerimaDuit}</div>
                     </div>
                     <div className="flex items-start">
-                      <span className="w-36 shrink-0">Uang sebanyak</span>
+                      <span className="w-36 shrink-0">Terbilang</span>
                       <span className="mr-3">:</span>
                       <div className="flex-1 italic font-bold text-base leading-tight uppercase bg-gray-50 px-1">
                         {terbilang(pTotal)} Rupiah
@@ -1736,7 +1848,7 @@ export default function App() {
 
                   <div className="flex mb-6">
                      <div className="border border-black py-1 px-4 text-base font-black italic flex gap-4 items-center bg-gray-50">
-                        <span>Terbilang Rp.</span>
+                        <span>Nominal Rp.</span>
                         <span>{formatCurrency(pTotal).replace('Rp ', '')} ,-</span>
                      </div>
                   </div>
@@ -1756,7 +1868,7 @@ export default function App() {
                     <div className="text-center flex flex-col items-center">
                       <div className="h-12 flex flex-col justify-end">
                         <p>{header.place}, {header.printDate}</p>
-                        <p className="mt-1 text-xs">Tanda terima uang,</p>
+                        <p className="mt-1 text-xs">Pembuat daftar,</p>
                       </div>
                       <div className="mt-10">
                         <p className="font-bold underline uppercase">{person.name}</p>
