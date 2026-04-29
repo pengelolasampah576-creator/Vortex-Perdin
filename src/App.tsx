@@ -1348,8 +1348,23 @@ export default function App() {
                         <div className="font-bold underline mb-0.5 uppercase text-xs">{person.name}</div>
                         <div className="uppercase">NIP. {person.nip}</div>
                       </td>
-                      <td className="border-r-2 border-black align-top px-2 py-1">
-                        Belanja Biaya Perjalanan Dinas Biasa - {header.tujuan}
+                      <td className="border-r-2 border-black align-top">
+                        <table className="w-full text-[10px]">
+                          <tbody>
+                            {person.expenses.map((exp, idx) => (
+                              <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-100" : ""}>
+                                <td className="p-0.5 w-32 uppercase">{exp.description}</td>
+                                <td className="p-0.5 w-16 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
+                                <td className="p-0.5 w-4 text-center text-neutral-300">x</td>
+                                <td className="p-0.5 text-right w-20 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
+                                <td className="p-0.5 w-4 text-center text-neutral-300">=</td>
+                                <td className="p-0.5 text-right font-medium">
+                                  {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </td>
                       <td className="border-r-2 border-black text-right align-top py-1 px-1 text-[11px] font-black">
                         {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
@@ -1763,7 +1778,7 @@ export default function App() {
           <div className="space-y-6 w-full flex flex-col items-center">
             <div className="bg-white shadow-2xl p-4 md:p-12 w-full max-w-[210mm] min-h-[148mm] print:shadow-none print:max-w-none print:w-full print:p-8 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col">
               {/* Header Info */}
-              <div className="grid grid-cols-2 text-[12px] mb-2">
+              <div className="grid grid-cols-2 text-[13px] mb-2">
                 <div className="space-y-0.5">
                   <div className="flex">
                     <span className="w-32">Tahun Anggaran</span>
@@ -1803,10 +1818,10 @@ export default function App() {
               </div>
 
               <div className="text-center mb-2">
-                <h2 className="text-lg font-bold uppercase underline">KWITANSI</h2>
+                <h2 className="text-xl font-bold uppercase underline">KWITANSI</h2>
               </div>
 
-              <div className="space-y-1.5 text-[13px] mb-4">
+              <div className="space-y-1.5 text-[14px] mb-4">
                 <div className="flex items-start">
                   <span className="w-36 shrink-0">Sudah Terima Dari</span>
                   <span className="mr-3">:</span>
@@ -1815,7 +1830,7 @@ export default function App() {
                 <div className="flex items-start">
                   <span className="w-36 shrink-0">Terbilang</span>
                   <span className="mr-3">:</span>
-                  <div className="flex-1 italic font-bold text-base leading-tight uppercase bg-gray-50 px-1">
+                  <div className="flex-1 italic font-bold text-lg leading-tight uppercase bg-gray-50 px-1">
                     {terbilang(grandTotal)} Rupiah
                   </div>
                 </div>
@@ -1829,13 +1844,13 @@ export default function App() {
               </div>
 
               <div className="flex mb-6">
-                 <div className="border border-black py-1 px-4 text-base font-black italic flex gap-4 items-center bg-gray-50">
+                 <div className="border border-black py-1 px-4 text-lg font-black italic flex gap-4 items-center bg-gray-50">
                     <span>Nominal Rp.</span>
                     <span>{formatCurrency(grandTotal).replace('Rp ', '')} ,-</span>
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 text-[12px] gap-y-8">
+              <div className="grid grid-cols-2 text-[13px] gap-y-8">
                 <div className="text-center flex flex-col items-center">
                   <div className="h-12 flex flex-col justify-end">
                     <p>Mengetahui :</p>
@@ -1850,7 +1865,7 @@ export default function App() {
                 <div className="text-center flex flex-col items-center">
                   <div className="h-12 flex flex-col justify-end">
                     <p>{header.place}, {header.printDate}</p>
-                    <p className="mt-1 text-xs">Pembuat daftar,</p>
+                    <p className="mt-1 text-sm">Pembuat daftar,</p>
                   </div>
                   <div className="mt-10">
                     <p className="font-bold underline uppercase">{header.listMakerName || '......................................'}</p>
