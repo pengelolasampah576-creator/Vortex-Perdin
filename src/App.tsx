@@ -1850,7 +1850,7 @@ export default function App() {
                 <div className="flex items-start">
                   <span className="w-36 shrink-0">Untuk Pembayaran</span>
                   <span className="mr-3">:</span>
-                  <div className="flex-1 leading-tight">
+                  <div className="flex-1 leading-tight text-justify">
                     Belanja Perjalanan Dinas Biasa - {header.tujuan} yang dilaksanakan pada Tgl {header.tujuanStartDate} s/d {header.tujuanEndDate} di {header.place}.
                   </div>
                 </div>
