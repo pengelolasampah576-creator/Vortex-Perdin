@@ -1348,23 +1348,8 @@ export default function App() {
                         <div className="font-bold underline mb-0.5 uppercase text-xs">{person.name}</div>
                         <div className="uppercase">NIP. {person.nip}</div>
                       </td>
-                      <td className="border-r-2 border-black align-top">
-                        <table className="w-full">
-                          <tbody>
-                            {person.expenses.map((exp, idx) => (
-                              <tr key={exp.id} className={idx < person.expenses.length - 1 ? "border-b border-neutral-200" : ""}>
-                                <td className="p-0.5 w-28">{exp.description}</td>
-                                <td className="p-0.5 w-20 text-center italic text-neutral-500">{exp.quantity} {exp.unit}</td>
-                                <td className="p-0.5 w-4 text-center text-neutral-300">x</td>
-                                <td className="p-0.5 text-right w-24 font-mono">{formatCurrency(exp.rate).replace('Rp ', '')}</td>
-                                <td className="p-0.5 w-4 text-center text-neutral-300">=</td>
-                                <td className="p-0.5 text-right font-medium">
-                                  {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <td className="border-r-2 border-black align-top px-2 py-1">
+                        Belanja Biaya Perjalanan Dinas Biasa - {header.tujuan}
                       </td>
                       <td className="border-r-2 border-black text-right align-top py-1 px-1 text-[11px] font-black">
                         {formatCurrency(person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0)).replace('Rp ', '')}
@@ -1774,133 +1759,128 @@ export default function App() {
         )}
 
         {viewMode === 'kwitansi_asli' && (
-          /* KWITANSI FORMAL PREVIEW */
+          /* KWITANSI FORMAL PREVIEW - SINGLE CONSOLIDATED RECEIPT */
           <div className="space-y-6 w-full flex flex-col items-center">
-            {persons.map((person) => {
-              const pTotal = person.expenses.reduce((sum, e) => sum + (e.quantity * e.rate), 0);
-              return (
-                <div key={person.id} className="bg-white shadow-2xl p-4 md:p-12 w-full max-w-[210mm] min-h-[148mm] print:shadow-none print:max-w-none print:w-full print:p-8 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page flex flex-col">
-                  {/* Header Info */}
-                  <div className="grid grid-cols-2 text-[12px] mb-2">
-                    <div className="space-y-0.5">
-                      <div className="flex">
-                        <span className="w-32">Tahun Anggaran</span>
-                        <span className="mr-2">:</span>
-                        <span>{header.tahunAnggaran}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32">Kegiatan</span>
-                        <span className="mr-2">:</span>
-                        <span className="flex-1">{header.kegiatan}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32">Sub Kegiatan</span>
-                        <span className="mr-2">:</span>
-                        <span className="flex-1">{header.subKegiatan}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32">Kode Rekening</span>
-                        <span className="mr-2">:</span>
-                        <span>{header.kodeRekening}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <div className="w-64 space-y-0.5">
-                        <div className="flex">
-                          <span className="w-24">BK. Umum</span>
-                          <span className="mr-2">:</span>
-                          <span className="flex-1 border-b border-dotted border-black">{header.bkUmum}</span>
-                        </div>
-                        <div className="flex mt-4">
-                          <span className="w-24">Tanggal</span>
-                          <span className="mr-2">:</span>
-                          <span className="flex-1 border-b border-dotted border-black">{header.bkTanggal}</span>
-                        </div>
-                      </div>
-                    </div>
+            <div className="bg-white shadow-2xl p-4 md:p-12 w-full max-w-[210mm] min-h-[148mm] print:shadow-none print:max-w-none print:w-full print:p-8 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 text-[12px] mb-2">
+                <div className="space-y-0.5">
+                  <div className="flex">
+                    <span className="w-32">Tahun Anggaran</span>
+                    <span className="mr-2">:</span>
+                    <span>{header.tahunAnggaran}</span>
                   </div>
-
-                  <div className="text-center mb-2">
-                    <h2 className="text-lg font-bold uppercase underline">KWITANSI</h2>
+                  <div className="flex">
+                    <span className="w-32">Kegiatan</span>
+                    <span className="mr-2">:</span>
+                    <span className="flex-1">{header.kegiatan}</span>
                   </div>
-
-                  <div className="space-y-1.5 text-[13px] mb-4">
-                    <div className="flex items-start">
-                      <span className="w-36 shrink-0">Sudah Terima Dari</span>
-                      <span className="mr-3">:</span>
-                      <div className="flex-1 font-medium leading-tight">{header.penerimaDuit}</div>
-                    </div>
-                    <div className="flex items-start">
-                      <span className="w-36 shrink-0">Terbilang</span>
-                      <span className="mr-3">:</span>
-                      <div className="flex-1 italic font-bold text-base leading-tight uppercase bg-gray-50 px-1">
-                        {terbilang(pTotal)} Rupiah
-                      </div>
-                    </div>
-                    <div className="flex items-start">
-                      <span className="w-36 shrink-0">Untuk Pembayaran</span>
-                      <span className="mr-3">:</span>
-                      <div className="flex-1 leading-tight">
-                        Belanja Perjalanan Dinas Biasa - {header.tujuan} yang dilaksanakan pada Tgl {header.tujuanStartDate} s/d {header.tujuanEndDate} di {header.place}.
-                      </div>
-                    </div>
+                  <div className="flex">
+                    <span className="w-32">Sub Kegiatan</span>
+                    <span className="mr-2">:</span>
+                    <span className="flex-1">{header.subKegiatan}</span>
                   </div>
-
-                  <div className="flex mb-6">
-                     <div className="border border-black py-1 px-4 text-base font-black italic flex gap-4 items-center bg-gray-50">
-                        <span>Nominal Rp.</span>
-                        <span>{formatCurrency(pTotal).replace('Rp ', '')} ,-</span>
-                     </div>
+                  <div className="flex">
+                    <span className="w-32">Kode Rekening</span>
+                    <span className="mr-2">:</span>
+                    <span>{header.kodeRekening}</span>
                   </div>
-
-                  <div className="grid grid-cols-2 text-[12px] gap-y-8">
-                    <div className="text-center flex flex-col items-center">
-                      <div className="h-12 flex flex-col justify-end">
-                        <p>Mengetahui :</p>
-                        <p className="uppercase">PPTK,</p>
-                      </div>
-                      <div className="mt-10">
-                        <p className="font-bold underline uppercase">{header.pptkName}</p>
-                        <p className="uppercase whitespace-nowrap">NIP. {header.pptkNip}</p>
-                      </div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <div className="w-64 space-y-0.5">
+                    <div className="flex">
+                      <span className="w-24">BK. Umum</span>
+                      <span className="mr-2">:</span>
+                      <span className="flex-1 border-b border-dotted border-black">{header.bkUmum}</span>
                     </div>
-
-                    <div className="text-center flex flex-col items-center">
-                      <div className="h-12 flex flex-col justify-end">
-                        <p>{header.place}, {header.printDate}</p>
-                        <p className="mt-1 text-xs">Pembuat daftar,</p>
-                      </div>
-                      <div className="mt-10">
-                        <p className="font-bold underline uppercase">{person.name}</p>
-                        <p className="uppercase whitespace-nowrap">NIP. {person.nip}</p>
-                      </div>
-                    </div>
-
-                    <div className="text-center flex flex-col items-center">
-                      <div className="h-12 flex flex-col justify-end">
-                        <p>Setuju dibayar :</p>
-                        <p className="uppercase">PENGGUNA ANGGARAN</p>
-                      </div>
-                      <div className="mt-10">
-                        <p className="font-bold underline uppercase">{header.paName}</p>
-                        <p className="uppercase whitespace-nowrap">NIP. {header.paNip}</p>
-                      </div>
-                    </div>
-
-                    <div className="text-center flex flex-col items-center">
-                      <div className="h-12 flex flex-col justify-end">
-                        <p>Lunas dibayar :</p>
-                        <p className="uppercase leading-tight">Bendahara Pengeluaran,</p>
-                      </div>
-                      <div className="mt-10">
-                        <p className="font-bold underline uppercase">{header.bendaharaName}</p>
-                        <p className="uppercase whitespace-nowrap">NIP. {header.bendaharaNip}</p>
-                      </div>
+                    <div className="flex mt-4">
+                      <span className="w-24">Tanggal</span>
+                      <span className="mr-2">:</span>
+                      <span className="flex-1 border-b border-dotted border-black">{header.bkTanggal}</span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+
+              <div className="text-center mb-2">
+                <h2 className="text-lg font-bold uppercase underline">KWITANSI</h2>
+              </div>
+
+              <div className="space-y-1.5 text-[13px] mb-4">
+                <div className="flex items-start">
+                  <span className="w-36 shrink-0">Sudah Terima Dari</span>
+                  <span className="mr-3">:</span>
+                  <div className="flex-1 font-medium leading-tight">{header.penerimaDuit}</div>
+                </div>
+                <div className="flex items-start">
+                  <span className="w-36 shrink-0">Terbilang</span>
+                  <span className="mr-3">:</span>
+                  <div className="flex-1 italic font-bold text-base leading-tight uppercase bg-gray-50 px-1">
+                    {terbilang(grandTotal)} Rupiah
+                  </div>
+                </div>
+                <div className="flex items-start">
+                  <span className="w-36 shrink-0">Untuk Pembayaran</span>
+                  <span className="mr-3">:</span>
+                  <div className="flex-1 leading-tight">
+                    Belanja Perjalanan Dinas Biasa - {header.tujuan} yang dilaksanakan pada Tgl {header.tujuanStartDate} s/d {header.tujuanEndDate} di {header.place}.
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex mb-6">
+                 <div className="border border-black py-1 px-4 text-base font-black italic flex gap-4 items-center bg-gray-50">
+                    <span>Nominal Rp.</span>
+                    <span>{formatCurrency(grandTotal).replace('Rp ', '')} ,-</span>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 text-[12px] gap-y-8">
+                <div className="text-center flex flex-col items-center">
+                  <div className="h-12 flex flex-col justify-end">
+                    <p>Mengetahui :</p>
+                    <p className="uppercase">PPTK,</p>
+                  </div>
+                  <div className="mt-10">
+                    <p className="font-bold underline uppercase">{header.pptkName}</p>
+                    <p className="uppercase whitespace-nowrap">NIP. {header.pptkNip}</p>
+                  </div>
+                </div>
+
+                <div className="text-center flex flex-col items-center">
+                  <div className="h-12 flex flex-col justify-end">
+                    <p>{header.place}, {header.printDate}</p>
+                    <p className="mt-1 text-xs">Pembuat daftar,</p>
+                  </div>
+                  <div className="mt-10">
+                    <p className="font-bold underline uppercase">{header.listMakerName || '......................................'}</p>
+                    <p className="uppercase whitespace-nowrap">NIP. {header.listMakerNip || '......................................'}</p>
+                  </div>
+                </div>
+
+                <div className="text-center flex flex-col items-center">
+                  <div className="h-12 flex flex-col justify-end">
+                    <p>Setuju dibayar :</p>
+                    <p className="uppercase">PENGGUNA ANGGARAN</p>
+                  </div>
+                  <div className="mt-10">
+                    <p className="font-bold underline uppercase">{header.paName}</p>
+                    <p className="uppercase whitespace-nowrap">NIP. {header.paNip}</p>
+                  </div>
+                </div>
+
+                <div className="text-center flex flex-col items-center">
+                  <div className="h-12 flex flex-col justify-end">
+                    <p>Lunas dibayar :</p>
+                    <p className="uppercase leading-tight">Bendahara Pengeluaran,</p>
+                  </div>
+                  <div className="mt-10">
+                    <p className="font-bold underline uppercase">{header.bendaharaName}</p>
+                    <p className="uppercase whitespace-nowrap">NIP. {header.bendaharaNip}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
