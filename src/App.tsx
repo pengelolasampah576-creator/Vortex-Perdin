@@ -1190,12 +1190,9 @@ export default function App() {
                   <p className="text-3xl font-black text-indigo-600">{header.tahunAnggaran}</p>
                 </div>
 
-                <div className="text-center space-y-1 border-t border-slate-100 pt-8 w-full max-w-sm">
+                <div className="text-center space-y-1 border-t border-slate-100 pt-8 w-full max-w-lg">
                   <p className="text-base font-black uppercase tracking-widest text-slate-800">
-                    {header.penerimaDuit.replace('Bendahara Pengeluaran ', '')}
-                  </p>
-                  <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
-                    Kabupaten Tabalong
+                    {header.penerimaDuit.replace('Bendahara Pengeluaran ', '')} KABUPATEN TABALONG
                   </p>
                 </div>
               </div>
