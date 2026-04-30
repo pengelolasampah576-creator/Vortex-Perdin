@@ -62,6 +62,7 @@ interface ExpenseItem {
   unit: string;
   rate: number;
   isRiil?: boolean;
+  riilPercentage?: number;
 }
 
 interface Person {
@@ -183,10 +184,10 @@ export default function App() {
       spdDate: '30 Januari 2026',
       riilPercentage: 30,
       expenses: [
-        { id: '1', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 380000, isRiil: false },
-        { id: '2', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 110000, isRiil: false },
-        { id: '3', description: 'Biaya Penginapan', quantity: 3, unit: 'Malam', rate: 250000, isRiil: true },
-        { id: '4', description: 'Biaya Transportasi', quantity: 1, unit: 'Layanan', rate: 180000, isRiil: false },
+        { id: '1', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 380000, isRiil: false, riilPercentage: 30 },
+        { id: '2', description: 'Uang Harian', quantity: 2, unit: 'Hari', rate: 110000, isRiil: false, riilPercentage: 30 },
+        { id: '3', description: 'Biaya Penginapan', quantity: 3, unit: 'Malam', rate: 250000, isRiil: true, riilPercentage: 30 },
+        { id: '4', description: 'Biaya Transportasi', quantity: 1, unit: 'Layanan', rate: 180000, isRiil: false, riilPercentage: 30 },
       ]
     }
   ];
@@ -218,7 +219,8 @@ export default function App() {
             riilPercentage: p.riilPercentage ?? 30,
             expenses: p.expenses.map((e: any) => ({
               ...e,
-              isRiil: e.isRiil ?? false
+              isRiil: e.isRiil ?? false,
+              riilPercentage: e.riilPercentage ?? p.riilPercentage ?? 30
             }))
           }));
           setPersons(migratedPersons);
@@ -318,7 +320,7 @@ export default function App() {
       spdNumber: header.spdNumber || '',
       spdDate: header.spdDate || '',
       riilPercentage: 30,
-      expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false }]
+      expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false, riilPercentage: 30 }]
     };
     setPersons([...persons, newPerson]);
   };
@@ -336,7 +338,7 @@ export default function App() {
       if (p.id === personId) {
         return {
           ...p,
-          expenses: [...p.expenses, { id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false }]
+          expenses: [...p.expenses, { id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false, riilPercentage: p.riilPercentage || 30 }]
         };
       }
       return p;
@@ -393,7 +395,10 @@ export default function App() {
 
   const grandTotal = useMemo(() => {
     return persons.reduce((sum, p) => {
-      return sum + p.expenses.reduce((pSum, e) => pSum + (e.quantity * e.rate), 0);
+      return sum + p.expenses.reduce((pSum, e) => {
+        const multiplier = e.isRiil ? ((e.riilPercentage === 0 ? 100 : (e.riilPercentage ?? 30)) / 100) : 1;
+        return pSum + (e.quantity * e.rate * multiplier);
+      }, 0);
     }, 0);
   }, [persons]);
 
@@ -1013,7 +1018,7 @@ export default function App() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Persentase Riil (%)</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Default % Riil (Item Baru)</label>
                         <input 
                           type="number"
                           placeholder="30" 
@@ -1039,9 +1044,9 @@ export default function App() {
                           <button 
                             onClick={() => {
                               const newExpenses = [
-                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 4, unit: 'Hari', rate: 430000, isRiil: false },
-                                { id: crypto.randomUUID(), description: 'Uang Penginapan', quantity: 3, unit: 'Malam', rate: 650000, isRiil: true },
-                                { id: crypto.randomUUID(), description: 'Transport Bandara (PP)', quantity: 1, unit: 'Layanan', rate: 300000, isRiil: false }
+                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 4, unit: 'Hari', rate: 430000, isRiil: false, riilPercentage: 30 },
+                                { id: crypto.randomUUID(), description: 'Uang Penginapan', quantity: 3, unit: 'Malam', rate: 650000, isRiil: true, riilPercentage: 30 },
+                                { id: crypto.randomUUID(), description: 'Transport Bandara (PP)', quantity: 1, unit: 'Layanan', rate: 300000, isRiil: false, riilPercentage: 30 }
                               ];
                               updatePerson(p.id, 'expenses', newExpenses);
                             }}
@@ -1052,8 +1057,8 @@ export default function App() {
                           <button 
                             onClick={() => {
                               const newExpenses = [
-                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 1, unit: 'Hari', rate: 150000, isRiil: false },
-                                { id: crypto.randomUUID(), description: 'Transport Lokal', quantity: 1, unit: 'Layanan', rate: 100000, isRiil: true }
+                                { id: crypto.randomUUID(), description: 'Uang Harian', quantity: 1, unit: 'Hari', rate: 150000, isRiil: false, riilPercentage: 30 },
+                                { id: crypto.randomUUID(), description: 'Transport Lokal', quantity: 1, unit: 'Layanan', rate: 100000, isRiil: true, riilPercentage: 30 }
                               ];
                               updatePerson(p.id, 'expenses', newExpenses);
                             }}
@@ -1067,7 +1072,7 @@ export default function App() {
                           <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest w-full mb-1">Quick Add (Riil):</span>
                           <button 
                             onClick={() => {
-                              const item = { id: crypto.randomUUID(), description: 'Sewa Hotel', quantity: 1, unit: 'Malam', rate: 0, isRiil: true };
+                              const item = { id: crypto.randomUUID(), description: 'Sewa Hotel', quantity: 1, unit: 'Malam', rate: 0, isRiil: true, riilPercentage: p.riilPercentage || 30 };
                               updatePerson(p.id, 'expenses', [...p.expenses, item]);
                             }}
                             className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
@@ -1076,7 +1081,7 @@ export default function App() {
                           </button>
                           <button 
                             onClick={() => {
-                              const item = { id: crypto.randomUUID(), description: 'Transportasi Riil', quantity: 1, unit: 'Layanan', rate: 0, isRiil: true };
+                              const item = { id: crypto.randomUUID(), description: 'Transportasi Riil', quantity: 1, unit: 'Layanan', rate: 0, isRiil: true, riilPercentage: p.riilPercentage || 30 };
                               updatePerson(p.id, 'expenses', [...p.expenses, item]);
                             }}
                             className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
@@ -1085,7 +1090,7 @@ export default function App() {
                           </button>
                           <button 
                             onClick={() => {
-                              const item = { id: crypto.randomUUID(), description: 'Lain-lain (Riil)', quantity: 1, unit: 'Item', rate: 0, isRiil: true };
+                              const item = { id: crypto.randomUUID(), description: 'Lain-lain (Riil)', quantity: 1, unit: 'Item', rate: 0, isRiil: true, riilPercentage: p.riilPercentage || 30 };
                               updatePerson(p.id, 'expenses', [...p.expenses, item]);
                             }}
                             className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 px-2 py-1 rounded-lg font-bold uppercase"
@@ -1142,6 +1147,17 @@ export default function App() {
                               className="w-full text-xs bg-white/5 border-white/5 rounded-lg p-2 text-right text-indigo-300 font-mono font-bold"
                             />
                           </div>
+                          {e.isRiil && (
+                            <div className="w-16 space-y-1">
+                              <label className="text-[8px] uppercase text-slate-500 font-bold ml-1">% Riil</label>
+                              <input 
+                                type="number"
+                                value={e.riilPercentage ?? 30}
+                                onChange={(val) => updateExpense(p.id, e.id, 'riilPercentage', parseInt(val.target.value) || 0)}
+                                className="w-full text-xs bg-indigo-500/10 border-indigo-500/20 rounded-lg p-2 text-center text-indigo-300 font-bold"
+                              />
+                            </div>
+                          )}
                           <div className="flex flex-col gap-1 pt-5">
                             <button 
                               onClick={() => updateExpense(p.id, e.id, 'isRiil', !e.isRiil)}
@@ -1524,47 +1540,38 @@ export default function App() {
                       <tr key={exp.id} className="border-b border-black">
                         <td className="border-r-2 border-black text-center py-1">{riilIdx + 1}.</td>
                         <td className="border-r-2 border-black px-2 py-1">
-                          <div className="flex gap-1 items-center text-[13px]">
-                            <input 
-                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] flex-1"
-                              value={exp.description ?? ''}
-                              onChange={(e) => updateExpense(person.id, exp.id, 'description', e.target.value)}
-                            />
-                            <span>x</span>
-                            <input 
-                              type="number"
-                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-6 text-center"
-                              value={exp.quantity ?? 0}
-                              onChange={(e) => updateExpense(person.id, exp.id, 'quantity', parseInt(e.target.value) || 0)}
-                            />
-                            <input 
-                              className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-12"
-                              value={exp.unit ?? ''}
-                              onChange={(e) => updateExpense(person.id, exp.id, 'unit', e.target.value)}
-                            />
-                            <div className="flex items-center font-bold px-1">
-                              <span>x</span>
-                              <input 
-                                type="number"
-                                className="bg-transparent border-none focus:ring-0 p-0 text-[13px] w-8 font-bold text-center"
-                                value={person.riilPercentage}
-                                onChange={(e) => updatePerson(person.id, 'riilPercentage', parseInt(e.target.value) || 0)}
-                              />
-                              <span>%</span>
+                          <div className="flex flex-col gap-0.5 text-[13px]">
+                            <div className="font-bold uppercase tracking-tight flex justify-between items-center">
+                              <span>{exp.description || '......................................'}</span>
+                              <div className="flex items-center gap-1 bg-neutral-50 px-1.5 rounded border border-neutral-200">
+                                <input 
+                                  type="number"
+                                  className="bg-transparent border-none focus:ring-0 p-0 text-[11px] w-8 font-black text-center text-indigo-600"
+                                  value={exp.riilPercentage ?? 30}
+                                  onChange={(e) => updateExpense(person.id, exp.id, 'riilPercentage', parseInt(e.target.value) || 0)}
+                                />
+                                <span className="text-[10px] text-neutral-400 font-bold">%</span>
+                              </div>
                             </div>
-                            <div className="hidden">
-                              <input 
-                                type="number"
-                                value={exp.rate ?? 0}
-                                onChange={(e) => updateExpense(person.id, exp.id, 'rate', parseInt(e.target.value) || 0)}
-                              />
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-600 italic">
+                              <span className="bg-white px-1">
+                                {exp.quantity} {exp.unit}
+                              </span>
+                              <span>x</span>
+                              <span className="font-mono">
+                                {formatCurrency(exp.rate).replace('Rp ', '')}
+                              </span>
+                              <span className="text-neutral-400">→</span>
+                              <span className="font-bold text-neutral-800">
+                                {formatCurrency(exp.quantity * exp.rate).replace('Rp ', '')}
+                              </span>
                             </div>
                           </div>
                         </td>
                         <td className="px-2 py-1">
                           <div className="flex justify-between w-full">
                             <span>Rp.</span>
-                            <span className="font-mono">{formatCurrency((exp.quantity * exp.rate) * (person.riilPercentage / 100)).replace('Rp ', '')}</span>
+                            <span className="font-mono">{formatCurrency((exp.quantity * exp.rate) * ((exp.riilPercentage === 0 ? 100 : (exp.riilPercentage ?? 30)) / 100)).replace('Rp ', '')}</span>
                           </div>
                         </td>
                       </tr>
@@ -1574,7 +1581,7 @@ export default function App() {
                       <td className="px-2">
                          <div className="flex justify-between w-full">
                             <span>Rp.</span>
-                            <span className="font-mono">{formatCurrency(person.expenses.filter(e => e.isRiil).reduce((s, e) => s + (e.quantity * e.rate * (person.riilPercentage / 100)), 0)).replace('Rp ', '')}</span>
+                            <span className="font-mono">{formatCurrency(person.expenses.filter(e => e.isRiil).reduce((s, e) => s + (e.quantity * e.rate * ((e.riilPercentage === 0 ? 100 : (e.riilPercentage ?? 30)) / 100)), 0)).replace('Rp ', '')}</span>
                          </div>
                       </td>
                     </tr>
