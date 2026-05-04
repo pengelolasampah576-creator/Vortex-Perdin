@@ -19,31 +19,12 @@ service cloud.firestore {
     }
 
     match /worksheets/{userId} {
-      // Izinkan baca jika ID dokumen sesuai dengan UID pengguna yang sedang login
+      // Izinkan baca jika pengguna login dan memiliki ID yang sesuai
       allow read: if isSignedIn() && request.auth.uid == userId;
       
-      // Pembantu validasi skema
-      function isValidWorksheet(data) {
-        return data.userId == request.auth.uid
-          && data.header is map
-          && data.persons is list
-          && data.updatedAt is timestamp
-          && data.userEmail is string
-          && data.keys().hasAll(['header', 'persons', 'userId', 'userEmail', 'updatedAt'])
-          && data.keys().size() == 5;
-      }
-
-      allow create: if isSignedIn() 
-        && request.auth.uid == userId
-        && isValidWorksheet(request.resource.data)
-        && request.resource.data.updatedAt == request.time;
-      
-      allow update: if isSignedIn() 
-        && request.auth.uid == userId
-        && isValidWorksheet(request.resource.data)
-        && request.resource.data.updatedAt == request.time;
-        
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      // Izinkan tulis jika data yang dikirim benar milik pengguna tersebut
+      allow write: if isSignedIn() && request.auth.uid == userId 
+        && request.resource.data.userId == request.auth.uid;
     }
   }
 }

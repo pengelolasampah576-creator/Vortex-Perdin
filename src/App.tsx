@@ -206,10 +206,18 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Login error:', error);
-      alert('Gagal login. Silakan coba lagi.');
+      console.log('Starting login process...');
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('Login success:', result.user.email);
+    } catch (error: any) {
+      console.error('Login error detailed:', error);
+      if (error.code === 'auth/popup-blocked') {
+        alert('Browser memblokir pop-up login. Harap izinkan pop-up untuk situs ini atau coba buka aplikasi di tab baru.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // User closed the popup, ignore
+      } else {
+        alert(`Gagal login: ${error.message || 'Silakan coba lagi.'}`);
+      }
     }
   };
 
@@ -217,6 +225,7 @@ export default function App() {
     if (confirm('Apakah Anda yakin ingin keluar?')) {
       try {
         await signOut(auth);
+        console.log('User signed out');
         // Reset state on logout
         setHeader(defaultHeader);
         setPersons(defaultPersons);
@@ -346,17 +355,20 @@ export default function App() {
     // 2. Save to Cloud if user is logged in
     if (user) {
       try {
-        const path = `worksheets/${user.uid}`;
         await setDoc(doc(db, 'worksheets', user.uid), {
           header,
           persons,
           userId: user.uid,
           userEmail: user.email,
           updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
         console.log('Saved to cloud successfully');
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, `worksheets/${user.uid}`);
+      } catch (error: any) {
+        if (error.message?.includes('offline')) {
+          console.warn('Saving to cloud failed: Client is offline. Data still saved locally.');
+        } else {
+          handleFirestoreError(error, OperationType.WRITE, `worksheets/${user.uid}`);
+        }
       }
     }
 
