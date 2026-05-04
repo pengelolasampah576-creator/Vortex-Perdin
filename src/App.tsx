@@ -20,13 +20,67 @@ import {
   Edit3,
   Eye,
   Maximize2,
-  Minimize2
+  Minimize2,
+  LogOut,
+  LogIn,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { STAFF_DATABASE } from './constants';
-import html2pdf from 'html2pdf.js';
+import { 
+  auth, 
+  googleProvider, 
+  signInWithPopup, 
+  onAuthStateChanged, 
+  signOut, 
+  User,
+  db,
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs
+} from './lib/firebase';
 
 // --- Utilities ---
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -116,12 +170,61 @@ interface DocHeader {
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [viewMode, setViewMode] = useState<'sampul' | 'kwitansi' | 'riil' | 'pernyataan' | 'laporan' | 'foto' | 'kwitansi_asli'>('sampul');
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [sidebarWidth, setSidebarWidth] = useState<'standard' | 'wide'>('standard');
+
+  // --- Authentication Handlers ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // Fetch data from Firestore when user logs in
+        try {
+          const docRef = doc(db, 'worksheets', currentUser.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.header) setHeader(data.header);
+            if (data.persons) setPersons(data.persons);
+            console.log('Worksheet loaded from cloud');
+          }
+        } catch (error) {
+          console.error('Error loading from cloud:', error);
+        }
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Gagal login. Silakan coba lagi.');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (confirm('Apakah Anda yakin ingin keluar?')) {
+      try {
+        await signOut(auth);
+        // Reset state on logout
+        setHeader(defaultHeader);
+        setPersons(defaultPersons);
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+  };
 
   const STORAGE_KEY = 'vortex_perdin_v1';
 
@@ -195,20 +298,16 @@ export default function App() {
   const [header, setHeader] = useState<DocHeader>(defaultHeader);
   const [persons, setPersons] = useState<Person[]>(defaultPersons);
 
-  // Load data from localStorage on mount
+  // Load data from localStorage on mount (Initial quick load)
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
         const { header: savedHeader, persons: savedPersons } = JSON.parse(savedData);
         if (savedHeader) {
-          setHeader(prev => ({
-            ...prev,
-            ...savedHeader
-          }));
+          setHeader(prev => ({ ...prev, ...savedHeader }));
         }
         if (savedPersons) {
-          // Merge saved persons with default properties to handle schema updates
           const migratedPersons = savedPersons.map((p: any) => ({
             ...p,
             jabatan: p.jabatan ?? '',
@@ -231,62 +330,34 @@ export default function App() {
     }
   }, []);
 
+
   const handleManualSave = async () => {
     setSaveStatus('saving');
+    
     const dataToSave = { 
       header, 
       persons,
       savedAt: new Date().toISOString()
     };
+
+    // 1. Save to LocalStorage (Fallback)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     
-    // Auto-download as JSON for backup/internal storage (phone/laptop)
-    try {
-      const baseFileName = `SmartLapor_${header.st?.replace(/[\/\\?%*:|"<>]/g, '-') || 'Data'}`;
-      const jsonFileName = `${baseFileName}_${new Date().getTime()}.json`;
-      const jsonBlob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
-      const jsonUrl = URL.createObjectURL(jsonBlob);
-      const jsonLink = document.createElement('a');
-      jsonLink.href = jsonUrl;
-      jsonLink.download = jsonFileName;
-      document.body.appendChild(jsonLink);
-      jsonLink.click();
-      document.body.removeChild(jsonLink);
-      URL.revokeObjectURL(jsonUrl);
-    } catch (err) {
-      console.error('Failed to auto-download JSON:', err);
-    }
-
-    // Auto-download as PDF for the current active report
-    try {
-      const element = document.getElementById('report-content-to-export');
-      if (element) {
-        // Clone element to manipulate without affecting UI
-        const opt = {
-          margin:       10, 
-          filename:     `Laporan_Perdin_${header.st?.replace(/[\/\\?%*:|"<>]/g, '-') || 'Dokumen'}_${viewMode}.pdf`,
-          image:        { type: 'jpeg' as const, quality: 0.98 },
-          html2canvas:  { 
-            scale: 2, 
-            useCORS: true, 
-            logging: true,
-            letterRendering: true,
-            windowWidth: 1200,
-            onclone: (clonedDoc: Document) => {
-              const exportNode = clonedDoc.getElementById('report-content-to-export');
-              if (exportNode) {
-                exportNode.style.background = 'white';
-                exportNode.style.color = 'black';
-              }
-            }
-          },
-          jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
-        };
-        
-        await html2pdf().set(opt).from(element).save();
+    // 2. Save to Cloud if user is logged in
+    if (user) {
+      try {
+        const path = `worksheets/${user.uid}`;
+        await setDoc(doc(db, 'worksheets', user.uid), {
+          header,
+          persons,
+          userId: user.uid,
+          userEmail: user.email,
+          updatedAt: serverTimestamp()
+        });
+        console.log('Saved to cloud successfully');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `worksheets/${user.uid}`);
       }
-    } catch (err) {
-      console.error('Failed to auto-generate PDF:', err);
     }
 
     setSaveStatus('saved');
@@ -408,6 +479,65 @@ export default function App() {
       window.print();
     }, 500);
   };
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#050510] flex items-center justify-center font-sans">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center"
+        >
+          <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+          <span className="text-indigo-300 font-black uppercase tracking-[0.3em] text-xs">Memuat Sesi...</span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#050510] flex items-center justify-center font-sans p-6 overflow-hidden relative">
+        {/* Background Gradients */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20 pointer-events-none">
+          <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-indigo-600 rounded-full blur-[160px]"></div>
+          <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-fuchsia-600 rounded-full blur-[160px]"></div>
+        </div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-10 relative z-10 shadow-2xl"
+        >
+          <div className="flex flex-col items-center text-center mb-10">
+            <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center mb-6 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] transform -rotate-6">
+              <ShieldCheck size={40} className="text-white" />
+            </div>
+            <h1 className="text-4xl font-black text-white italic tracking-tight mb-2">Smart<span className="text-indigo-400">Lapor</span></h1>
+            <p className="text-slate-400 text-sm font-medium tracking-wide">Sistem Pelaporan Perjalanan Dinas</p>
+          </div>
+
+          <div className="space-y-4">
+            <button 
+              onClick={handleLogin}
+              className="w-full py-5 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-slate-100 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-black/20"
+            >
+              <LogIn size={20} />
+              Login dengan Google
+            </button>
+            <div className="flex flex-col gap-1 p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+              <p className="text-[10px] text-indigo-400/60 text-center uppercase font-black tracking-widest">
+                Akses Terbatas
+              </p>
+              <p className="text-[9px] text-slate-500 text-center font-medium">
+                Gunakan akun email resmi untuk keamanan data. 
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans relative overflow-hidden flex flex-col md:flex-row">
       {/* Background Mesh Gradients */}
@@ -433,6 +563,16 @@ export default function App() {
           >
             {sidebarWidth === 'wide' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             {sidebarWidth === 'wide' ? 'Samping' : 'Layar Penuh'}
+          </button>
+        </div>
+
+        <div className="mb-6 no-print">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-2xl transition-all group"
+          >
+            <LogOut size={20} className="text-red-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-red-300">Keluar Sistem</span>
           </button>
         </div>
 

@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Worksheet": {
+      "title": "Worksheet",
+      "description": "User's perdin worksheet data",
+      "type": "object",
+      "properties": {
+        "header": { "type": "object" },
+        "persons": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" }
+      },
+      "required": ["header", "persons", "userId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/worksheets/{worksheetId}": {
+      "schema": "Worksheet",
+      "description": "Stored worksheets for users"
+    }
+  }
+}
