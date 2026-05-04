@@ -7,11 +7,11 @@
       "properties": {
         "header": { "type": "object" },
         "persons": { "type": "array" },
-        "updatedAt": { "type": "string", "format": "date-time" },
         "userId": { "type": "string" },
-        "userEmail": { "type": "string" }
+        "userEmail": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["header", "persons", "userId", "updatedAt"]
+      "required": ["header", "persons", "userId", "userEmail", "updatedAt"]
     }
   },
   "firestore": {
