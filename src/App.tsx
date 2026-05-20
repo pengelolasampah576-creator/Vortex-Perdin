@@ -406,8 +406,9 @@ export default function App() {
               <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center mb-6 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] transform -rotate-6">
                 <ShieldCheck size={40} className="text-white" />
               </div>
-              <h1 className="text-4xl font-black text-white italic tracking-tight mb-2">Smart<span className="text-indigo-400">Lapor</span></h1>
-              <p className="text-slate-400 text-sm font-medium tracking-wide">Sistem Pelaporan Perjalanan Dinas</p>
+              <h1 className="text-4xl font-black text-white italic tracking-tight mb-2">Smart <span className="text-indigo-400">SPJ</span></h1>
+              <p className="text-slate-400 text-sm font-bold tracking-wide uppercase text-indigo-300">Inspektorat Tabalong</p>
+              <p className="text-slate-500 text-[11px] font-medium tracking-wide mt-1">Sistem Administrasi & Pelaporan SPJ Perjalanan Dinas</p>
             </div>
 
             <form onSubmit={handlePasscodeSubmit} className="space-y-6">
@@ -467,8 +468,8 @@ export default function App() {
                   <FileText size={24} />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight text-white">SmartLapor Pro</h1>
-                  <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Management System</p>
+                  <h1 className="text-lg font-bold tracking-tight text-white leading-tight">Smart SPJ</h1>
+                  <p className="text-[9px] text-indigo-400 font-bold tracking-widest uppercase">Inspektorat Tabalong</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
