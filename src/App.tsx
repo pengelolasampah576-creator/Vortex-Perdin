@@ -118,12 +118,37 @@ interface DocHeader {
 }
 
 export default function App() {
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('smartlapor_auth') === 'true';
+  });
+  const [passError, setPassError] = useState('');
+  
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [viewMode, setViewMode] = useState<'sampul' | 'kwitansi' | 'riil' | 'pernyataan' | 'laporan' | 'foto' | 'kwitansi_asli'>('sampul');
   const [searchTerm, setSearchTerm] = useState('');
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [sidebarWidth, setSidebarWidth] = useState<'standard' | 'wide'>('standard');
+
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPass = passwordInput.trim().toLowerCase();
+    // Allow 'tabalong', 'perdin123', 'smartlapor' as default Indonesian password
+    if (cleanPass === 'tabalong' || cleanPass === 'perdin123' || cleanPass === 'smartlapor' || cleanPass === 'admin123') {
+      setIsAuthenticated(true);
+      localStorage.setItem('smartlapor_auth', 'true');
+      setPassError('');
+    } else {
+      setPassError('Sandi salah! Silakan coba lagi atau hubungi Admin.');
+    }
+  };
+
+  const handleLock = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('smartlapor_auth');
+    setPasswordInput('');
+  };
 
   const STORAGE_KEY = 'vortex_perdin_v1';
 
@@ -364,31 +389,105 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans relative overflow-hidden flex flex-col md:flex-row">
-      {/* Background Mesh Gradients */}
-      <div className="absolute -top-[10%] -left-[10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute top-[40%] -right-[5%] w-[400px] h-[400px] bg-fuchsia-600/15 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute -bottom-[10%] left-[20%] w-[600px] h-[300px] bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none"></div>
-
-      {/* Sidebar - Control Panel */}
-      <div className={`relative z-10 w-full ${sidebarWidth === 'wide' ? 'md:w-[900px]' : 'md:w-[520px]'} bg-[#0f172a]/95 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-6 md:p-8 sticky top-0 no-print flex flex-col shadow-2xl transition-all duration-500`}>
-        <div className="flex items-center justify-between mb-10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-2xl flex items-center justify-center font-bold text-white shadow-lg">
-              <FileText size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">SmartLapor Pro</h1>
-              <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Management System</p>
-            </div>
+      {!isAuthenticated ? (
+        <div className="min-h-screen w-full bg-[#050510] flex items-center justify-center font-sans p-6 overflow-hidden relative">
+          {/* Background Gradients */}
+          <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20 pointer-events-none">
+            <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-indigo-600 rounded-full blur-[160px]"></div>
+            <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-fuchsia-600 rounded-full blur-[160px]"></div>
           </div>
-          <button 
-            onClick={() => setSidebarWidth(sidebarWidth === 'wide' ? 'standard' : 'wide')}
-            className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-10 relative z-10 shadow-2xl"
           >
-            {sidebarWidth === 'wide' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            {sidebarWidth === 'wide' ? 'Samping' : 'Layar Penuh'}
-          </button>
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center mb-6 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] transform -rotate-6">
+                <ShieldCheck size={40} className="text-white" />
+              </div>
+              <h1 className="text-4xl font-black text-white italic tracking-tight mb-2">Smart<span className="text-indigo-400">Lapor</span></h1>
+              <p className="text-slate-400 text-sm font-medium tracking-wide">Sistem Pelaporan Perjalanan Dinas</p>
+            </div>
+
+            <form onSubmit={handlePasscodeSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 pl-1 block">Sandi Akses Dokumen</label>
+                <input 
+                  type="password"
+                  placeholder="Masukkan Sandi..."
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full py-4 px-5 bg-white/5 border border-white/10 rounded-2xl text-white text-center font-bold tracking-widest placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-lg"
+                  autoFocus
+                />
+              </div>
+
+              {passError && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-400 text-xs text-center font-semibold"
+                >
+                  {passError}
+                </motion.p>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full py-5 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-slate-100 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-black/20"
+              >
+                <LogIn size={20} />
+                Buka Akses
+              </button>
+              
+              <div className="flex flex-col gap-1.5 p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                <p className="text-[10px] text-indigo-400/60 text-center uppercase font-black tracking-widest">
+                  Petunjuk Akses
+                </p>
+                <p className="text-[10px] text-slate-400 text-center font-medium leading-relaxed">
+                  Gunakan sandi default <span className="font-mono text-indigo-300 font-bold px-1.5 py-0.5 bg-indigo-500/10 rounded">tabalong</span> untuk masuk ke dalam sistem.
+                </p>
+              </div>
+            </form>
+          </motion.div>
         </div>
+      ) : (
+        <>
+          {/* Background Mesh Gradients */}
+          <div className="absolute -top-[10%] -left-[10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+          <div className="absolute top-[40%] -right-[5%] w-[400px] h-[400px] bg-fuchsia-600/15 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="absolute -bottom-[10%] left-[20%] w-[600px] h-[300px] bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none"></div>
+
+          {/* Sidebar - Control Panel */}
+          <div className={`relative z-10 w-full ${sidebarWidth === 'wide' ? 'md:w-[900px]' : 'md:w-[520px]'} bg-[#0f172a]/95 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-6 md:p-8 sticky top-0 no-print flex flex-col shadow-2xl transition-all duration-500`}>
+            <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-2xl flex items-center justify-center font-bold text-white shadow-lg">
+                  <FileText size={24} />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-white">SmartLapor Pro</h1>
+                  <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Management System</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setSidebarWidth(sidebarWidth === 'wide' ? 'standard' : 'wide')}
+                  className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+                  title={sidebarWidth === 'wide' ? 'Samping' : 'Layar Penuh'}
+                >
+                  {sidebarWidth === 'wide' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+                <button 
+                  onClick={handleLock}
+                  className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl border border-red-500/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center"
+                  title="Kunci Sistem"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            </div>
 
         <div className={`space-y-6 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-500/30 scrollbar-track-white/5 pr-4 -mr-2 ${sidebarWidth === 'wide' ? 'max-w-4xl mx-auto w-full' : ''}`}>
           <div className="space-y-6 pb-8">
@@ -1877,6 +1976,8 @@ export default function App() {
             * Gunakan browser Chrome atau Edge untuk hasil cetak terbaik. Aktifkan "Backround Graphics" di menu printer.
         </div>
       </div>
+      </>
+      )}
 
       <style>{`
         @media print {
