@@ -23,10 +23,17 @@ import {
   Minimize2,
   LogOut,
   LogIn,
-  ShieldCheck
+  ShieldCheck,
+  History,
+  FolderOpen,
+  Copy,
+  Download,
+  Upload,
+  PlusCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { STAFF_DATABASE } from './constants';
+import WorksheetHistory from './components/WorksheetHistory';
 
 // --- Utilities ---
 
@@ -117,6 +124,14 @@ interface DocHeader {
   paNip: string;
 }
 
+interface SavedWorksheet {
+  id: string;
+  title: string;
+  header: DocHeader;
+  persons: Person[];
+  savedAt: string;
+}
+
 export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -130,6 +145,14 @@ export default function App() {
   const [activePersonIdForSearch, setActivePersonIdForSearch] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [sidebarWidth, setSidebarWidth] = useState<'standard' | 'wide'>('standard');
+
+  const [sidebarTab, setSidebarTab] = useState<'form' | 'history'>('form');
+  const [history, setHistory] = useState<SavedWorksheet[]>(() => {
+    const saved = localStorage.getItem('smart_spj_history_v1');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,27 +278,202 @@ export default function App() {
   }, []);
 
 
+  const calculateWorksheetTotal = (personsList: Person[]) => {
+    return personsList.reduce((sum, p) => {
+      return sum + p.expenses.reduce((pSum, e) => {
+        const multiplier = e.isRiil ? ((e.riilPercentage === 0 ? 100 : (e.riilPercentage ?? 30)) / 100) : 1;
+        return pSum + (e.quantity * e.rate * multiplier);
+      }, 0);
+    }, 0);
+  };
+
   const handleManualSave = async () => {
     setSaveStatus('saving');
     
-    const dataToSave = { 
+    const documentTitle = header.tujuan || 'Dokumen Tanpa Judul';
+    const timestamp = new Date().toISOString();
+    let updatedHistory = [...history];
+
+    if (activeWorksheetId) {
+      // Update existing item in history
+      updatedHistory = history.map(item => {
+        if (item.id === activeWorksheetId) {
+          return {
+            ...item,
+            title: documentTitle,
+            header: { ...header },
+            persons: JSON.parse(JSON.stringify(persons)), // deep copy
+            savedAt: timestamp
+          };
+        }
+        return item;
+      });
+      console.log('Updated existing draft in history:', activeWorksheetId);
+    } else {
+      // Save as a brand new item in history
+      const newId = crypto.randomUUID();
+      const newWorksheet: SavedWorksheet = {
+        id: newId,
+        title: documentTitle,
+        header: { ...header },
+        persons: JSON.parse(JSON.stringify(persons)),
+        savedAt: timestamp
+      };
+      updatedHistory = [newWorksheet, ...history];
+      setActiveWorksheetId(newId);
+      console.log('Saved new draft in history:', newId);
+    }
+
+    // Save to local storage
+    localStorage.setItem('smart_spj_history_v1', JSON.stringify(updatedHistory));
+    setHistory(updatedHistory);
+
+    // Save current active cache (for state recovery on page reload)
+    const cachedData = { 
       header, 
       persons,
-      savedAt: new Date().toISOString()
+      savedAt: timestamp
     };
-
-    // Save to LocalStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedData));
     
     setSaveStatus('saved');
     setTimeout(() => setSaveStatus('idle'), 2000);
   };
 
   const handleReset = () => {
-    if (confirm('Apakah Anda yakin ingin menghapus semua data dan kembali ke format awal?')) {
+    if (confirm('Apakah Anda yakin ingin menghapus semua data di form ini dan kembali ke format awal? (Catatan riwayat dokumen Anda yang lain TIDAK akan terhapus)')) {
       setHeader(defaultHeader);
       setPersons(defaultPersons);
+      setActiveWorksheetId(null);
       localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
+  const handleCreateNewBlank = () => {
+    if (confirm('Buat lembar kerja SPJ kosong baru? Lembar kerja yang sekarang sedang diedit akan bersih dari Form.')) {
+      setHeader({
+        ...defaultHeader,
+        st: '',
+        spdNumber: '',
+        tujuan: '',
+        stDate: '',
+        spdDate: '',
+        printDate: '',
+        listMakerName: '',
+        listMakerNip: '',
+        dasarPoints: [],
+        hasilPoints: [],
+        hasilDescriptive: 'Telah melakukan perjalanan dinas dengan hasil sebagai berikut :',
+        bkUmum: '',
+        bkTanggal: '',
+      });
+      setPersons([
+        {
+          id: crypto.randomUUID(),
+          name: '',
+          nip: '',
+          jabatan: '',
+          unitKerja: 'Inspektorat Daerah Kabupaten Tabalong',
+          ket: '',
+          riilDescription: 'Biaya penginapan pegawai dibawah ini yang tidak dapat diperoleh bukti-bukti pengeluaran meliputi :',
+          spdNumber: '',
+          spdDate: '',
+          riilPercentage: 30,
+          expenses: [{ id: crypto.randomUUID(), description: '', quantity: 1, unit: '', rate: 0, isRiil: false, riilPercentage: 30 }]
+        }
+      ]);
+      setActiveWorksheetId(null);
+      localStorage.removeItem(STORAGE_KEY);
+      setSidebarTab('form');
+    }
+  };
+
+  const handleLoadWorksheet = (item: SavedWorksheet) => {
+    setHeader(JSON.parse(JSON.stringify(item.header)));
+    setPersons(JSON.parse(JSON.stringify(item.persons)));
+    setActiveWorksheetId(item.id);
+    setSidebarTab('form');
+    // Also update quick cache
+    const cachedData = {
+      header: item.header,
+      persons: item.persons,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedData));
+  };
+
+  const handleDeleteWorksheet = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent loading when clicking delete
+    if (confirm('Apakah Anda yakin ingin menghapus dokumen ini secara permanen dari riwayat?')) {
+      const updatedHistory = history.filter(item => item.id !== id);
+      setHistory(updatedHistory);
+      localStorage.setItem('smart_spj_history_v1', JSON.stringify(updatedHistory));
+      if (activeWorksheetId === id) {
+        setActiveWorksheetId(null);
+      }
+    }
+  };
+
+  const handleDuplicateWorksheet = (item: SavedWorksheet, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newId = crypto.randomUUID();
+    const duplicated: SavedWorksheet = {
+      ...JSON.parse(JSON.stringify(item)),
+      id: newId,
+      title: `${item.title} (Salinan)`,
+      savedAt: new Date().toISOString()
+    };
+    const updatedHistory = [duplicated, ...history];
+    setHistory(updatedHistory);
+    localStorage.setItem('smart_spj_history_v1', JSON.stringify(updatedHistory));
+  };
+
+  const handleExportHistory = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `Backup_SmartSPJ_Inspektorat_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportHistory = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    if(e.target.files && e.target.files[0]) {
+      fileReader.readAsText(e.target.files[0], "UTF-8");
+      fileReader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target?.result as string);
+          if (Array.isArray(parsed)) {
+            const validated = parsed.filter(item => item.id && item.header && item.persons);
+            if (validated.length === 0) {
+              alert('File cadangan tidak valid atau kosong.');
+              return;
+            }
+            if(confirm(`Apakah Anda yakin ingin mengimpor ${validated.length} dokumen SPJ dari file cadangan ini?`)) {
+              setHistory(prev => {
+                const merged = [...prev];
+                validated.forEach(item => {
+                  const idx = merged.findIndex(m => m.id === item.id);
+                  if (idx > -1) {
+                    merged[idx] = item;
+                  } else {
+                    merged.push(item);
+                  }
+                });
+                localStorage.setItem('smart_spj_history_v1', JSON.stringify(merged));
+                return merged;
+              });
+              alert('Histori berhasil diimpor!');
+            }
+          } else {
+            alert('Format file salah. File cadangan harus berupa array JSON.');
+          }
+        } catch (err) {
+          alert('Gagal membaca file cadangan. Pastikan file berupa backup JSON dari Smart SPJ.');
+        }
+      };
     }
   };
 
@@ -372,12 +570,7 @@ export default function App() {
   };
 
   const grandTotal = useMemo(() => {
-    return persons.reduce((sum, p) => {
-      return sum + p.expenses.reduce((pSum, e) => {
-        const multiplier = e.isRiil ? ((e.riilPercentage === 0 ? 100 : (e.riilPercentage ?? 30)) / 100) : 1;
-        return pSum + (e.quantity * e.rate * multiplier);
-      }, 0);
-    }, 0);
+    return calculateWorksheetTotal(persons);
   }, [persons]);
 
   const handlePrint = () => {
@@ -461,39 +654,188 @@ export default function App() {
           <div className="absolute -bottom-[10%] left-[20%] w-[600px] h-[300px] bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none"></div>
 
           {/* Sidebar - Control Panel */}
-          <div className={`relative z-10 w-full ${sidebarWidth === 'wide' ? 'md:w-[900px]' : 'md:w-[520px]'} bg-[#0f172a]/95 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-6 md:p-8 sticky top-0 no-print flex flex-col shadow-2xl transition-all duration-500`}>
-            <div className="flex items-center justify-between mb-10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-2xl flex items-center justify-center font-bold text-white shadow-lg">
-                  <FileText size={24} />
+          <div className={`relative z-10 w-full ${sidebarWidth === 'wide' ? 'md:w-[65%]' : 'md:w-1/2'} bg-[#0f172a]/95 backdrop-blur-2xl border-r border-white/10 overflow-y-auto h-screen p-4 md:p-5 sticky top-0 no-print flex flex-col shadow-2xl transition-all duration-500`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shrink-0">
+                  <FileText size={18} />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold tracking-tight text-white leading-tight">Smart SPJ</h1>
-                  <p className="text-[9px] text-indigo-400 font-bold tracking-widest uppercase">Inspektorat Tabalong</p>
+                  <h1 className="text-sm font-black tracking-tight text-white leading-tight">Smart SPJ</h1>
+                  <p className="text-[8px] text-indigo-400 font-extrabold tracking-widest uppercase">Inspektorat Tabalong</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button 
                   onClick={() => setSidebarWidth(sidebarWidth === 'wide' ? 'standard' : 'wide')}
-                  className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg border border-white/5 transition-all text-[9px] font-black uppercase tracking-widest flex items-center"
                   title={sidebarWidth === 'wide' ? 'Samping' : 'Layar Penuh'}
                 >
-                  {sidebarWidth === 'wide' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  {sidebarWidth === 'wide' ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
                 </button>
                 <button 
                   onClick={handleLock}
-                  className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl border border-red-500/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center"
+                  className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/10 transition-all text-[9px] font-black uppercase tracking-widest flex items-center"
                   title="Kunci Sistem"
                 >
-                  <LogOut size={14} />
+                  <LogOut size={12} />
                 </button>
               </div>
             </div>
 
-        <div className={`space-y-6 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-500/30 scrollbar-track-white/5 pr-4 -mr-2 ${sidebarWidth === 'wide' ? 'max-w-4xl mx-auto w-full' : ''}`}>
-          <div className="space-y-6 pb-8">
-            <section>
-              <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Header Dokumen</h2>
+            {/* Sidebar Tab Switcher */}
+            <div className="grid grid-cols-2 gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5 mb-3.5 no-print shrink-0">
+              <button
+                onClick={() => setSidebarTab('form')}
+                className={`py-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-1.5 ${
+                  sidebarTab === 'form' 
+                    ? 'bg-indigo-550 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-550/25' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <FileText size={11} />
+                Form SPJ
+              </button>
+              <button
+                onClick={() => setSidebarTab('history')}
+                className={`py-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-1.5 relative ${
+                  sidebarTab === 'history' 
+                    ? 'bg-indigo-550 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-550/25' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <History size={11} />
+                Riwayat
+                {history.length > 0 && (
+                  <span className="bg-fuchsia-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black">
+                    {history.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {sidebarTab === 'form' ? (
+              <>
+                {activeWorksheetId && (
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl flex items-center justify-between text-[11px] mb-2.5 no-print gap-3 shrink-0">
+                    <div className="flex items-center gap-2 text-indigo-300 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                      <span className="truncate">Mengedit: <strong className="text-white">Riwayat SPJ</strong></span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setActiveWorksheetId(null);
+                        alert('Koneksi riwayat dilepas. Klik tombol Simpan untuk menyimpan sebagai dokumen baru.');
+                      }}
+                      className="text-[8px] text-slate-400 hover:text-white uppercase tracking-wider font-extrabold shrink-0 px-2 py-1 bg-white/5 rounded border border-white/5 hover:bg-white/10 transition-colors"
+                      title="Simpan sebagai dokumen baru"
+                    >
+                      Buka Baru
+                    </button>
+                  </div>
+                )}
+
+                {/* Compact Toolbar & View Selector at top */}
+                <div className="bg-slate-900/60 p-2.5 rounded-xl border border-white/10 mb-4 space-y-2 shrink-0 no-print shadow-xl">
+                  <div className="flex items-center justify-between px-1.5">
+                    <span className="text-[8px] uppercase tracking-wider font-black text-indigo-400/90">PRATINJAU DOKUMEN</span>
+                    <span className="text-[8px] bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold uppercase">
+                      {viewMode === 'kwitansi' ? 'Rincian' : viewMode === 'kwitansi_asli' ? 'Kwitansi' : viewMode}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-1 text-[8px] font-black uppercase tracking-wider">
+                    <button 
+                      onClick={() => setViewMode('sampul')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'sampul' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-450 hover:text-white hover:bg-white/10'}`}
+                    >
+                      Sampul
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('kwitansi')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'kwitansi' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Rincian Rencana Biaya Perjalanan Dinas"
+                    >
+                      Rincian
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('riil')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'riil' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Daftar Pengeluaran Riil"
+                    >
+                      Riil
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('pernyataan')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'pernyataan' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Surat Pernyataan Rincian"
+                    >
+                      Pernyataan
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('laporan')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'laporan' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Laporan Perjalanan Dinas"
+                    >
+                      Laporan
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('foto')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'foto' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Foto/Bukti Dukung"
+                    >
+                      Foto
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('kwitansi_asli')}
+                      className={`py-1 rounded-lg transition-all border text-center ${viewMode === 'kwitansi_asli' ? 'bg-indigo-600 border-indigo-500 text-white font-extrabold shadow-sm' : 'bg-white/5 border-transparent text-slate-455 hover:text-white hover:bg-white/10'}`}
+                      title="Kwitansi Pembayaran"
+                    >
+                      Kwitansi
+                    </button>
+                    <button 
+                      onClick={handlePrint}
+                      className="py-1 rounded-lg transition-all border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 flex items-center justify-center gap-0.5 font-bold cursor-pointer active:scale-95"
+                      title="Cetak/Print Dokumen"
+                    >
+                      <Printer size={9} />
+                      Cetak
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
+                    <button 
+                      onClick={handleReset}
+                      className="flex items-center justify-center gap-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-black py-1.5 rounded-lg transition-all border border-white/5 uppercase text-[8px] tracking-wider active:scale-95"
+                    >
+                      <RotateCcw size={9} />
+                      Reset Form
+                    </button>
+                    <button 
+                      onClick={handleManualSave}
+                      disabled={saveStatus !== 'idle'}
+                      className={`flex items-center justify-center gap-1 font-black py-1.5 rounded-lg transition-all border uppercase text-[8px] tracking-wider active:scale-95 ${
+                        saveStatus === 'saved' 
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
+                          : 'bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-700'
+                      }`}
+                    >
+                      {saveStatus === 'saving' ? (
+                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : saveStatus === 'saved' ? (
+                        <CheckCircle2 size={9} />
+                      ) : (
+                        <Save size={9} />
+                      )}
+                      {saveStatus === 'saved' ? 'Tersimpan' : 'Simpan SPJ'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`space-y-6 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-500/30 scrollbar-track-white/5 pr-4 -mr-2 ${sidebarWidth === 'wide' ? 'max-w-4xl mx-auto w-full' : ''}`}>
+                  <div className="space-y-6 pb-8">
+                    <section>
+                      <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Header Dokumen</h2>
               <div className="space-y-4 bg-white/[0.01] p-5 rounded-2xl border border-white/5">
                 <div className="group">
                   <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Nomor ST</label>
@@ -1244,91 +1586,24 @@ export default function App() {
             </section>
           </div>
         </div>
-
-        <div className="pt-6 border-t border-white/10 mt-auto space-y-3">
-          <div className="bg-white/5 p-1 rounded-xl border border-white/5 mb-2">
-            <div className="grid grid-cols-2 gap-1 text-[8px] uppercase font-bold text-center">
-              <button 
-                onClick={() => setViewMode('sampul')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'sampul' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'} col-span-2`}
-              >
-                Sampul Laporan
-              </button>
-              <button 
-                onClick={() => setViewMode('kwitansi')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'kwitansi' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Rincian Biaya
-              </button>
-              <button 
-                onClick={() => setViewMode('riil')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'riil' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Pengeluaran Riil
-              </button>
-              <button 
-                onClick={() => setViewMode('pernyataan')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'pernyataan' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Pernyataan
-              </button>
-              <button 
-                onClick={() => setViewMode('laporan')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'laporan' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Laporan
-              </button>
-              <button 
-                onClick={() => setViewMode('foto')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'foto' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Foto
-              </button>
-              <button 
-                onClick={() => setViewMode('kwitansi_asli')}
-                className={`py-2 rounded-lg transition-all ${viewMode === 'kwitansi_asli' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-white'}`}
-              >
-                Kwitansi
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={handleReset}
-              className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold py-3 rounded-2xl transition-all border border-white/10 uppercase text-[10px] tracking-widest"
-            >
-              <RotateCcw size={12} />
-              Reset
-            </button>
-            <button 
-              onClick={handleManualSave}
-              disabled={saveStatus !== 'idle'}
-              className={`flex items-center justify-center gap-2 font-bold py-3 rounded-2xl transition-all border uppercase text-[10px] tracking-widest ${
-                saveStatus === 'saved' 
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
-                  : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              {saveStatus === 'saving' ? (
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : saveStatus === 'saved' ? (
-                <CheckCircle2 size={12} />
-              ) : (
-                <Save size={12} />
-              )}
-              {saveStatus === 'saved' ? 'Tersimpan' : 'Simpan'}
-            </button>
-          </div>
-          
-          <button 
-            onClick={handlePrint}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-indigo-500/20 active:scale-[0.98] uppercase text-xs tracking-widest"
-          >
-            <Printer size={16} />
-            Cetak Dokumen
-          </button>
-        </div>
-      </div>
+      </>
+    ) : (
+      <WorksheetHistory
+        history={history}
+        activeWorksheetId={activeWorksheetId}
+        historySearchTerm={historySearchTerm}
+        setHistorySearchTerm={setHistorySearchTerm}
+        onLoadWorksheet={handleLoadWorksheet}
+        onDeleteWorksheet={handleDeleteWorksheet}
+        onDuplicateWorksheet={handleDuplicateWorksheet}
+        onCreateNewBlank={handleCreateNewBlank}
+        onExportHistory={handleExportHistory}
+        onImportHistory={handleImportHistory}
+        formatCurrency={formatCurrency}
+        calculateWorksheetTotal={calculateWorksheetTotal}
+      />
+    )}
+  </div>
 
       {/* Main Preview Area */}
       <div id="report-content-to-export" className={`relative z-10 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 md:p-12 flex flex-col items-center print:p-0 print:bg-white pb-20 ${sidebarWidth === 'wide' ? 'hidden md:flex md:opacity-0 md:pointer-events-none md:absolute md:-z-10' : 'flex'}`}>
