@@ -1780,8 +1780,8 @@ export default function App() {
         {viewMode === 'riil' && (
           /* DAFTAR PENGELUARAN RIIL PREVIEW */
           <div className="space-y-6 w-full flex flex-col items-center">
-            {persons.map((person) => (
-              <div key={person.id} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page">
+            {persons.map((person, index) => (
+              <div key={person.id} className={`bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-4 text-black rounded-3xl md:rounded-[40px] print:rounded-none ${index < persons.length - 1 ? 'break-after-page' : ''}`}>
                 <div className="text-center mb-4">
                   <h1 className="text-lg font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
                     SURAT PERNYATAAN DAFTAR PENGELUARAN RIIL
@@ -1944,8 +1944,8 @@ export default function App() {
         {viewMode === 'pernyataan' && (
           /* SURAT PERNYATAAN / SPTJM PREVIEW */
           <div className="space-y-10 w-full flex flex-col items-center">
-            {persons.map((person) => (
-              <div key={person.id} className="bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-20 text-black rounded-3xl md:rounded-[40px] print:rounded-none break-after-page flex flex-col">
+            {persons.map((person, index) => (
+              <div key={person.id} className={`bg-white shadow-2xl p-4 md:p-14 w-full max-w-[210mm] min-h-[297mm] print:shadow-none print:max-w-none print:w-full print:p-20 text-black rounded-3xl md:rounded-[40px] print:rounded-none flex flex-col ${index < persons.length - 1 ? 'break-after-page' : ''}`}>
                 <div className="text-center mb-10">
                   <h1 className="text-xl font-bold uppercase tracking-widest border-b-2 border-black inline-block px-4">
                     SURAT PERNYATAAN
