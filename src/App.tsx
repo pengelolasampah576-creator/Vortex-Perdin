@@ -939,10 +939,10 @@ export default function App() {
                 </div>
 
                 <div className="group relative">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Pembuat Daftar</label>
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Penerima Uang</label>
                   <input 
                     type="text" 
-                    placeholder="Cari Pembuat Daftar..."
+                    placeholder="Cari Penerima Uang..."
                     value={header.listMakerName ?? ''}
                     onChange={(e) => {
                       setHeader({...header, listMakerName: e.target.value});
@@ -964,7 +964,7 @@ export default function App() {
                   {activePersonIdForSearch === 'listMaker' && filteredStaff.length > 0 && (
                     <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl font-sans">
                       <div className="p-2 border-b border-white/5 bg-white/5">
-                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pembuat Daftar</span>
+                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Penerima Uang</span>
                       </div>
                       <div className="max-h-60 overflow-y-auto no-scrollbar">
                         {filteredStaff.map((staff, sIdx) => (
@@ -987,7 +987,7 @@ export default function App() {
                 </div>
 
                 <div className="group">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Pembuat Daftar</label>
+                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">NIP Penerima Uang</label>
                   <input 
                     type="text" 
                     value={header.listMakerNip ?? ''}
@@ -1762,7 +1762,7 @@ export default function App() {
               <div className="text-center space-y-12">
                 <div className="font-medium min-h-[2.5rem] flex flex-col justify-end pb-1">
                   <span className="text-[11px] mb-1">{header.signingPlace}, {header.printDate}</span>
-                  <span>Pembuat Daftar,</span>
+                  <span>Penerima Uang,</span>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="font-bold underline uppercase text-[15px]">
@@ -2214,7 +2214,7 @@ export default function App() {
                 <div className="text-center flex flex-col items-center">
                   <div className="h-12 flex flex-col justify-end">
                     <p>{header.signingPlace}, {header.printDate}</p>
-                    <p className="mt-1 text-sm">Pembuat daftar,</p>
+                    <p className="mt-1 text-sm">Penerima Uang,</p>
                   </div>
                   <div className="mt-10">
                     <p className="font-bold underline uppercase">{header.listMakerName || '......................................'}</p>
