@@ -29,11 +29,13 @@ import {
   Copy,
   Download,
   Upload,
-  PlusCircle
+  PlusCircle,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { STAFF_DATABASE } from './constants';
+import { STAFF_DATABASE, StaffMember } from './constants';
 import WorksheetHistory from './components/WorksheetHistory';
+import { StaffManager } from './components/StaffManager';
 
 // --- Utilities ---
 
@@ -146,13 +148,54 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [sidebarWidth, setSidebarWidth] = useState<'standard' | 'wide'>('standard');
 
-  const [sidebarTab, setSidebarTab] = useState<'form' | 'history'>('form');
+  const [sidebarTab, setSidebarTab] = useState<'form' | 'history' | 'staff'>('form');
   const [history, setHistory] = useState<SavedWorksheet[]>(() => {
     const saved = localStorage.getItem('smart_spj_history_v1');
     return saved ? JSON.parse(saved) : [];
   });
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
+
+  const STAFF_STORAGE_KEY = 'smart_spj_staff_db_v2';
+  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
+    try {
+      const saved = localStorage.getItem(STAFF_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading staff db:', e);
+    }
+    return STAFF_DATABASE.map(s => ({
+      ...s,
+      id: s.id || crypto.randomUUID()
+    }));
+  });
+
+  const handleUpdateStaffList = (newList: StaffMember[]) => {
+    setStaffList(newList);
+    try {
+      localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(newList));
+    } catch (e) {
+      console.error('Failed to save staff database to localStorage:', e);
+    }
+  };
+
+  const handleResetStaffList = () => {
+    const defaultList = STAFF_DATABASE.map(s => ({
+      ...s,
+      id: crypto.randomUUID()
+    }));
+    setStaffList(defaultList);
+    try {
+      localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(defaultList));
+    } catch (e) {
+      console.error('Failed to reset staff database:', e);
+    }
+  };
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -479,10 +522,13 @@ export default function App() {
 
   const filteredStaff = useMemo(() => {
     if (!searchTerm) return [];
-    return STAFF_DATABASE.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 8);
-  }, [searchTerm]);
+    const term = searchTerm.toLowerCase();
+    return staffList.filter(s => 
+      s.name.toLowerCase().includes(term) ||
+      s.nip.toLowerCase().includes(term) ||
+      (s.jabatan && s.jabatan.toLowerCase().includes(term))
+    ).slice(0, 10);
+  }, [searchTerm, staffList]);
 
   const addPerson = () => {
     const newPerson: Person = {
@@ -684,12 +730,12 @@ export default function App() {
             </div>
 
             {/* Sidebar Tab Switcher */}
-            <div className="grid grid-cols-2 gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5 mb-3.5 no-print shrink-0">
+            <div className="grid grid-cols-3 gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5 mb-3.5 no-print shrink-0">
               <button
                 onClick={() => setSidebarTab('form')}
                 className={`py-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-1.5 ${
                   sidebarTab === 'form' 
-                    ? 'bg-indigo-550 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-550/25' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-500/25' 
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -700,7 +746,7 @@ export default function App() {
                 onClick={() => setSidebarTab('history')}
                 className={`py-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-1.5 relative ${
                   sidebarTab === 'history' 
-                    ? 'bg-indigo-550 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-550/25' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-500/25' 
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -711,6 +757,20 @@ export default function App() {
                     {history.length}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => setSidebarTab('staff')}
+                className={`py-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-1.5 relative ${
+                  sidebarTab === 'staff' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow shadow-indigo-500/25' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users size={11} />
+                Pegawai
+                <span className="bg-indigo-500/30 text-indigo-300 text-[8px] px-1.5 py-0.5 rounded-full font-black border border-indigo-400/20">
+                  {staffList.length}
+                </span>
               </button>
             </div>
 
@@ -939,7 +999,18 @@ export default function App() {
                 </div>
 
                 <div className="group relative">
-                  <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Penerima</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase">Penerima</label>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarTab('staff')}
+                      className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 hover:underline transition-colors"
+                      title="Buka Database Pegawai untuk menambah atau mengedit pegawai"
+                    >
+                      <Users size={10} />
+                      Database Pegawai
+                    </button>
+                  </div>
                   <input 
                     type="text" 
                     placeholder="Cari Penerima..."
@@ -961,26 +1032,43 @@ export default function App() {
                   <div className="absolute right-2 top-8 text-white/20">
                     <Search size={14} />
                   </div>
-                  {activePersonIdForSearch === 'listMaker' && filteredStaff.length > 0 && (
+                  {activePersonIdForSearch === 'listMaker' && (
                     <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl font-sans">
-                      <div className="p-2 border-b border-white/5 bg-white/5">
+                      <div className="p-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
                         <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Penerima</span>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSidebarTab('staff');
+                          }}
+                          className="text-[9px] text-indigo-300 hover:text-white uppercase font-bold flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 transition-colors"
+                        >
+                          <Users size={10} />
+                          Edit Database
+                        </button>
                       </div>
                       <div className="max-h-60 overflow-y-auto no-scrollbar">
-                        {filteredStaff.map((staff, sIdx) => (
-                          <button
-                            key={`${staff.nip}-${sIdx}`}
-                            type="button"
-                            className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectStaffForListMaker(staff);
-                            }}
-                          >
-                            <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
-                            <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
-                          </button>
-                        ))}
+                        {filteredStaff.length > 0 ? (
+                          filteredStaff.map((staff, sIdx) => (
+                            <button
+                              key={`${staff.nip}-${sIdx}`}
+                              type="button"
+                              className="w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                selectStaffForListMaker(staff);
+                              }}
+                            >
+                              <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors">{staff.name}</div>
+                              <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-center text-xs text-slate-400">
+                            Tidak ditemukan. <button type="button" onMouseDown={(e) => { e.preventDefault(); setSidebarTab('staff'); }} className="text-indigo-400 underline font-bold">Edit Database Pegawai</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1060,7 +1148,18 @@ export default function App() {
             <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-4">Pejabat & Bendahara</h2>
             <div className="space-y-4">
               <div className="group relative">
-                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block uppercase">Bendahara</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase">Bendahara</label>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab('staff')}
+                    className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 hover:underline transition-colors"
+                    title="Buka Database Pegawai untuk menambah atau mengedit pegawai"
+                  >
+                    <Users size={10} />
+                    Database Pegawai
+                  </button>
+                </div>
                 <div className="relative">
                   <input 
                     type="text" 
@@ -1084,26 +1183,43 @@ export default function App() {
                   </div>
                 </div>
 
-                {activePersonIdForSearch === 'bendahara' && filteredStaff.length > 0 && (
+                {activePersonIdForSearch === 'bendahara' && (
                   <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl">
-                    <div className="p-3 border-b border-white/5 bg-white/5">
-                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Staff</span>
+                    <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pegawai</span>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSidebarTab('staff');
+                        }}
+                        className="text-[9px] text-indigo-300 hover:text-white uppercase font-bold flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 transition-colors"
+                      >
+                        <Users size={10} />
+                        Edit Database
+                      </button>
                     </div>
                     <div className="max-h-60 overflow-y-auto no-scrollbar">
-                      {filteredStaff.map((staff, sIdx) => (
-                        <button
-                          key={`${staff.nip}-${sIdx}`}
-                          type="button"
-                          className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            selectStaffForBendahara(staff);
-                          }}
-                        >
-                          <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
-                          <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
-                        </button>
-                      ))}
+                      {filteredStaff.length > 0 ? (
+                        filteredStaff.map((staff, sIdx) => (
+                          <button
+                            key={`${staff.nip}-${sIdx}`}
+                            type="button"
+                            className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectStaffForBendahara(staff);
+                            }}
+                          >
+                            <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors">{staff.name}</div>
+                            <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-xs text-slate-400">
+                          Tidak ditemukan. <button type="button" onMouseDown={(e) => { e.preventDefault(); setSidebarTab('staff'); }} className="text-indigo-400 underline font-bold">Edit Database Pegawai</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1314,7 +1430,18 @@ export default function App() {
                   
                   <div className="space-y-4">
                     <div className="relative group/field">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 mb-2 block">Cari di Database Staff</label>
+                      <div className="flex items-center justify-between pl-1 mb-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Cari di Database Pegawai</label>
+                        <button
+                          type="button"
+                          onClick={() => setSidebarTab('staff')}
+                          className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 hover:underline transition-colors"
+                          title="Buka Database Pegawai untuk menambah atau mengedit pegawai"
+                        >
+                          <Users size={10} />
+                          Database Pegawai
+                        </button>
+                      </div>
                       <div className="relative">
                         <input 
                           placeholder="Ketik Nama Pegawai..." 
@@ -1338,26 +1465,43 @@ export default function App() {
                         </div>
                       </div>
                       
-                      {activePersonIdForSearch === p.id && filteredStaff.length > 0 && (
+                      {activePersonIdForSearch === p.id && (
                         <div className="absolute z-50 left-0 right-0 top-full bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden backdrop-blur-xl">
-                          <div className="p-3 border-b border-white/5 bg-white/5">
-                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Staff</span>
+                          <div className="p-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest pl-2">Hasil Pencarian Pegawai</span>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setSidebarTab('staff');
+                              }}
+                              className="text-[9px] text-indigo-300 hover:text-white uppercase font-bold flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 transition-colors"
+                            >
+                              <Users size={10} />
+                              Edit Database
+                            </button>
                           </div>
                           <div className="max-h-60 overflow-y-auto no-scrollbar">
-                            {filteredStaff.map((staff, sIdx) => (
-                              <button
-                                key={`${staff.nip}-${sIdx}`}
-                                type="button"
-                                className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  selectStaffForPerson(p.id, staff);
-                                }}
-                              >
-                                <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors uppercase">{staff.name}</div>
-                                <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
-                              </button>
-                            ))}
+                            {filteredStaff.length > 0 ? (
+                              filteredStaff.map((staff, sIdx) => (
+                                <button
+                                  key={`${staff.nip}-${sIdx}`}
+                                  type="button"
+                                  className="w-full text-left px-4 py-4 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 group/item"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    selectStaffForPerson(p.id, staff);
+                                  }}
+                                >
+                                  <div className="font-bold text-white text-xs group-hover/item:text-indigo-300 transition-colors">{staff.name}</div>
+                                  <div className="text-slate-500 font-mono text-[9px] mt-0.5">{staff.nip}</div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="p-3 text-center text-xs text-slate-400">
+                                Tidak ditemukan. <button type="button" onMouseDown={(e) => { e.preventDefault(); setSidebarTab('staff'); }} className="text-indigo-400 underline font-bold">Edit Database Pegawai</button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1587,7 +1731,7 @@ export default function App() {
           </div>
         </div>
       </>
-    ) : (
+    ) : sidebarTab === 'history' ? (
       <WorksheetHistory
         history={history}
         activeWorksheetId={activeWorksheetId}
@@ -1601,6 +1745,13 @@ export default function App() {
         onImportHistory={handleImportHistory}
         formatCurrency={formatCurrency}
         calculateWorksheetTotal={calculateWorksheetTotal}
+      />
+    ) : (
+      <StaffManager
+        staffList={staffList}
+        onUpdateStaffList={handleUpdateStaffList}
+        onResetToDefault={handleResetStaffList}
+        onClose={() => setSidebarTab('form')}
       />
     )}
   </div>
@@ -1703,7 +1854,7 @@ export default function App() {
                     <tr key={person.id} className="bg-white border-b-2 border-black last:border-b-0">
                       <td className="border-r-2 border-black text-center align-top py-1 font-bold">{index + 1}</td>
                       <td className="border-r-2 border-black align-top p-1 leading-tight">
-                        <div className="font-bold underline mb-0.5 uppercase text-xs">{person.name}</div>
+                        <div className="font-bold underline mb-0.5 text-xs">{person.name}</div>
                         <div className="uppercase">NIP. {person.nip}</div>
                       </td>
                       <td className="border-r-2 border-black align-top">
@@ -1754,7 +1905,7 @@ export default function App() {
                   <span>Bendahara,</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="font-bold underline uppercase text-[15px]">{header.bendaharaName}</span>
+                  <span className="font-bold underline text-[15px]">{header.bendaharaName}</span>
                   <span className="uppercase text-xs">NIP. {header.bendaharaNip}</span>
                 </div>
               </div>
@@ -1765,7 +1916,7 @@ export default function App() {
                   <span>Penerima,</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="font-bold underline uppercase text-[15px]">
+                  <span className="font-bold underline text-[15px]">
                     {header.listMakerName || '......................................'}
                   </span>
                   <span className="uppercase text-xs">
@@ -1932,7 +2083,7 @@ export default function App() {
                       {header.signingPlace}, {header.printDate} <br/>
                       Yang melakukan perjalanan dinas,
                     </div>
-                    <div className="font-bold underline uppercase">{person.name}</div>
+                    <div className="font-bold underline">{person.name}</div>
                     <div className="uppercase">NIP. {person.nip}</div>
                   </div>
                 </div>
@@ -1962,7 +2113,7 @@ export default function App() {
                       <tr>
                         <td className="w-40 py-1">Nama</td>
                         <td className="w-4">:</td>
-                        <td className="font-bold uppercase">{person.name || '......................................'}</td>
+                        <td className="font-bold">{person.name || '......................................'}</td>
                       </tr>
                       <tr>
                         <td className="w-40 py-1">NIP.</td>
@@ -1972,12 +2123,12 @@ export default function App() {
                       <tr>
                         <td className="w-40 py-1">Jabatan</td>
                         <td className="w-4">:</td>
-                        <td className="uppercase">{person.jabatan || '......................................'}</td>
+                        <td>{person.jabatan || '......................................'}</td>
                       </tr>
                       <tr>
                         <td className="w-40 py-1">Unit Kerja/SKPD</td>
                         <td className="w-4">:</td>
-                        <td className="uppercase">{person.unitKerja || '......................................'}</td>
+                        <td>{person.unitKerja || '......................................'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1996,7 +2147,7 @@ export default function App() {
                     <div className="mb-20">
                       {header.signingPlace}, {header.printDate} <br/>
                     </div>
-                    <div className="font-bold underline uppercase">{person.name || '......................................'}</div>
+                    <div className="font-bold underline">{person.name || '......................................'}</div>
                     <div className="uppercase">NIP. {person.nip || '......................................'}</div>
                   </div>
                 </div>
@@ -2068,8 +2219,8 @@ export default function App() {
             <div className="mt-16 grid grid-cols-2 text-[13px]">
               <div className="text-center">
                 <p>Mengetahui</p>
-                <p className="font-bold uppercase mb-20">{header.inspectorJabatan}</p>
-                <p className="font-bold underline uppercase">{header.inspectorName}</p>
+                <p className="font-bold mb-20">{header.inspectorJabatan}</p>
+                <p className="font-bold underline">{header.inspectorName}</p>
                 <p>{header.inspectorUnit}</p>
                 <p>NIP. {header.inspectorNip}</p>
               </div>
@@ -2082,7 +2233,7 @@ export default function App() {
                       <div className="flex gap-2 items-center">
                         <span className="w-4">{idx + 1}.</span>
                         <div className="flex-1 min-w-[150px]">
-                          <p className="font-bold underline uppercase whitespace-nowrap">{person.name}</p>
+                          <p className="font-bold underline whitespace-nowrap">{person.name}</p>
                           <p className="text-[11px]">NIP. {person.nip}</p>
                         </div>
                         <div className="border-b border-black w-24 ml-4 h-1"></div>
@@ -2206,7 +2357,7 @@ export default function App() {
                     <p className="uppercase">PPTK,</p>
                   </div>
                   <div className="mt-10">
-                    <p className="font-bold underline uppercase">{header.pptkName}</p>
+                    <p className="font-bold underline">{header.pptkName}</p>
                     <p className="uppercase whitespace-nowrap">NIP. {header.pptkNip}</p>
                   </div>
                 </div>
@@ -2217,7 +2368,7 @@ export default function App() {
                     <p className="mt-1 text-sm">Penerima,</p>
                   </div>
                   <div className="mt-10">
-                    <p className="font-bold underline uppercase">{header.listMakerName || '......................................'}</p>
+                    <p className="font-bold underline">{header.listMakerName || '......................................'}</p>
                     <p className="uppercase whitespace-nowrap">NIP. {header.listMakerNip || '......................................'}</p>
                   </div>
                 </div>
@@ -2228,7 +2379,7 @@ export default function App() {
                     <p className="uppercase">PENGGUNA ANGGARAN</p>
                   </div>
                   <div className="mt-10">
-                    <p className="font-bold underline uppercase">{header.paName}</p>
+                    <p className="font-bold underline">{header.paName}</p>
                     <p className="uppercase whitespace-nowrap">NIP. {header.paNip}</p>
                   </div>
                 </div>
@@ -2239,7 +2390,7 @@ export default function App() {
                     <p className="uppercase leading-tight">Bendahara Pengeluaran,</p>
                   </div>
                   <div className="mt-10">
-                    <p className="font-bold underline uppercase">{header.bendaharaName}</p>
+                    <p className="font-bold underline">{header.bendaharaName}</p>
                     <p className="uppercase whitespace-nowrap">NIP. {header.bendaharaNip}</p>
                   </div>
                 </div>

@@ -1,4 +1,12 @@
-export const STAFF_DATABASE = [
+export interface StaffMember {
+  id?: string;
+  name: string;
+  nip: string;
+  jabatan: string;
+  unitKerja: string;
+}
+
+export const STAFF_DATABASE: StaffMember[] = [
   { name: "DIYANTO, SE, MT", nip: "19711013 200501 1 005", jabatan: "Inspektur", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "RINA SETYANA, S.Sos.,M.Si", nip: "19720410 200003 2 013", jabatan: "Inspektur Pembantu III", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "SURIADI, S.Sos", nip: "19680705 198903 1 017", jabatan: "Inspektur Pembantu II", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
@@ -54,7 +62,7 @@ export const STAFF_DATABASE = [
   { name: "HALIMATUS SAKDIAH, S.AP", nip: "19870224 202421 2 005", jabatan: "Arsiparis Ahli Pertama", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "SEPTIANA PUTRI AYU, S.IP", nip: "19950908 202521 2 003", jabatan: "Penata Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "MUHAMMAD KHAIRUL", nip: "20000531 202521 1 004", jabatan: "Operator Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
-  { name: "WAHYU GUNAWAN, S.Pd", nip: "19890630 202521 1 045", jabatan: "Penata Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
+  { name: "Wahyu Gunawan, S.Pd.", nip: "19890630 202521 1 045", jabatan: "Penata Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "Sudiani", nip: "198607272025211175", jabatan: "Operator Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "Ferdian Resmana, SE", nip: "197908032025211072", jabatan: "Penata Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
   { name: "Muhammad Ansar", nip: "200211092025211011", jabatan: "Operator Layanan Operasional", unitKerja: "Inspektorat Daerah Kabupaten Tabalong" },
